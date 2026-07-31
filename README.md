@@ -18,19 +18,22 @@ Chromium with one flag change to `install.sh`.
 - **Slack's Light/Dark Color Mode** flips automatically when you switch
   themes — the extension opens Preferences → Appearance, picks the right
   radio, and closes the dialog (all hidden from view).
-- **Pushes updates instantly** when you switch themes. A small Python
-  native-messaging host polls the active Omarchy theme and sends the new
-  state to the extension within a second.
+- **Pushes updates instantly** when you switch themes. A small
+  native-messaging host hooks into omarchy's own `theme-set` event and pushes
+  the new state to the extension the moment the theme lands.
 
 https://github.com/user-attachments/assets/83787af6-7c41-4449-9460-c7f67b21aa5b
 
 ## How it works
 
 ```
+  omarchy-theme-set ──omarchy-hook theme-set──► hooks/omarchy-slack-theme
+                                                          │ SIGUSR1
+                                                          ▼
 ┌──────────────┐   length-prefixed JSON   ┌────────────────────┐
-│  Python      │ ────────────────────────►│  Browser service   │
-│  native host │ ◄──────────────────────  │  worker (MV3 bg)   │
-│  (stdio)     │                          └────────┬───────────┘
+│  native host │ ────────────────────────►│  Browser service   │
+│  (bash)      │   push-only, never read  │  worker (MV3 bg)   │
+│              │                          └────────┬───────────┘
 └──────────────┘                                   │ chrome.tabs.sendMessage
    reads (Omarchy 4):                              ▼
    ~/.local/state/omarchy/current/  ┌────────────────────────────┐
@@ -42,6 +45,11 @@ https://github.com/user-attachments/assets/83787af6-7c41-4449-9460-c7f67b21aa5b
                                     └────────────────────────────┘
    (pre-4 ~/.config/omarchy/current/ is still supported as a fallback)
 ```
+
+The host is **push-only** — it never parses inbound messages. It emits once on
+connect, then again whenever omarchy's `theme-set` hook signals it. A slow 30s
+poll runs as a safety net. If no hook is installed (Omarchy older than v3.1.0)
+the host falls back to a 1s poll instead, matching the pre-hook behavior.
 
 Slack's Color Mode is flipped by:
 
@@ -60,38 +68,56 @@ background — robust to themes that don't use the obvious day/night naming
 
 ## Requirements
 
-- Brave (or Chrome / Chromium) — Manifest V3
-- Python 3.8+
-- Linux + [Omarchy](https://omarchy.org/) — Omarchy 4
-  (`~/.local/state/omarchy/current/`) or the pre-4 `~/.config/omarchy/current/`
-  location
+- Brave, Chrome, Chromium, or Edge — Manifest V3
+- Bash + coreutils. No Python, no runtime dependencies.
+- Linux + [Omarchy](https://omarchy.org/). Both Omarchy 3 and 4 work — the host
+  reads Omarchy 4's `~/.local/state/omarchy/current/` and falls back to the
+  pre-4 `~/.config/omarchy/current/` location.
 - An `alacritty.toml` in the active theme dir (the host falls back to
   `colors.toml` if that's missing)
 
 ## Install
 
-1. **Load the unpacked extension**
-   - Open `brave://extensions`
-   - Toggle on **Developer mode**
-   - Click **Load unpacked** and select the `extension/` folder
-   - Copy the **extension ID** Brave shows on the card (32 letters a–p)
+```sh
+./install.sh
+```
 
-2. **Install the native-messaging host**
+That's it — there's no extension ID to copy. `extension/manifest.json` pins the
+ID with a `key`, so it's `egagnaecglnnmbbnpbbccgajinplhckp` on every machine,
+and `install.sh` bakes it into the host manifest for you.
 
-   ```sh
-   ./install.sh <EXTENSION_ID>
-   ```
+The script does three things:
 
-   For Chrome / Chromium add `--browser chrome` or `--browser chromium`.
+1. Registers the native-messaging host in all nine Chromium-family profile dirs
+   (Chromium, Chrome ×3, Brave ×3, Edge ×2).
+2. Installs the omarchy `theme-set` hook — into `hooks/theme-set.d/` on Omarchy
+   3.8+/4, or as a clearly-marked block appended to your existing
+   `hooks/theme-set` on Omarchy 3.1–3.7, which didn't support `.d` directories.
+   Your own hooks in either location are left alone.
+3. Adds `--load-extension` to the flags files of the browsers you actually have
+   installed, so the extension loads without Developer mode.
 
-   This writes `~/.config/BraveSoftware/Brave-Browser/NativeMessagingHosts/com.omarchy.slack_theme.json`
-   (or the equivalent for Chrome/Chromium) pointing at `native-host/omarchy-theme-host.py`
-   and allow-listing your extension ID.
+Then **fully quit your browser** (`pkill brave` — closing the window isn't
+enough) and open `app.slack.com`.
 
-3. **Restart the browser** (fully quit, not just close the window — `pkill brave` if needed).
+> **Upgrading from a manual install?** Remove the copy you loaded via
+> **Load unpacked** first. It shares the now-pinned ID with the
+> `--load-extension` copy, and only one of the two will load.
 
-4. **Open `app.slack.com`.** Switch omarchy themes and Slack should follow
-   within a second.
+Options:
+
+| Flag | Effect |
+| --- | --- |
+| `--no-flags` | Skip the flags-file edits; load `extension/` by hand instead. |
+| `--uninstall` | Reverse all three steps. |
+
+### Omarchy version support
+
+| Omarchy | Hook wiring | Update latency |
+| --- | --- | --- |
+| 4.x, 3.8+ | `hooks/theme-set.d/omarchy-slack-theme` | instant |
+| 3.1 – 3.7 | marked block in `hooks/theme-set` | instant |
+| < 3.1 | none (no hook system) | ≤ 1s poll |
 
 ## Verifying it works
 
@@ -142,10 +168,10 @@ Slack tab.
 - **Synthetic `Ctrl+,` doesn't open Preferences** in some Brave builds (the
   React handler appears to check `event.isTrusted`). The menu-click path is
   the real workhorse; the keyboard attempt is best-effort.
-- **The native host polls file mtimes once per second.** Switching omarchy
-  themes faster than that and reloading the Slack tab in the same breath can
-  put the extension on stale state for ≤1s. The content script issues a
-  "fresh read" request before triggering the auto-flip, so it self-corrects.
+- **On Omarchy older than v3.1.0 the host polls once per second**, since there's
+  no `theme-set` hook to signal it. Switching themes and reloading the Slack tab
+  in the same breath can leave it on stale state for ≤1s; the content script
+  re-reads the last pushed theme before the auto-flip, so it self-corrects.
 - **Only one workspace at a time has been tested.** Multi-workspace setups
   should work since the selectors are workspace-agnostic, but PRs welcome.
 - **No popup UI, no options page.** This is intentional — the extension has
@@ -155,16 +181,19 @@ Slack tab.
 
 ```
 extension/
-├── manifest.json                   # MV3 manifest
-├── background.js                   # service worker; manages native port
+├── manifest.json                   # MV3 manifest; pins the extension ID via "key"
+├── background.js                   # service worker; holds the native port
 ├── content.js                      # injects CSS + drives prefs automation
 └── inject-prefers-color-scheme.js  # MAIN-world bridge: matchMedia shim + React onClick
 
 native-host/
-├── omarchy-theme-host.py           # length-prefixed JSON over stdio
+├── omarchy-slack-theme-host        # bash; pushes length-prefixed JSON over stdio
 └── com.omarchy.slack_theme.json.template
 
-install.sh                          # writes native-host manifest into the browser's dir
+hooks/
+└── omarchy-slack-theme             # theme-set hook; SIGUSRs every running host
+
+install.sh                          # host manifests + hook + --load-extension wiring
 ```
 
 ## License

@@ -5,6 +5,12 @@ let port = null;
 let reconnectTimer = null;
 
 function connect() {
+  // The service worker can reach this from three directions at once: the
+  // module-level call below, onInstalled, and onStartup. Without this guard each
+  // one opens its own port, and every port spawns a separate long-lived native
+  // host — so the theme-set hook then signals N hosts and every theme change
+  // gets broadcast to the same tabs N times.
+  if (port) return;
   try {
     port = chrome.runtime.connectNative(HOST);
     console.log("[omarchy] native port connected");
@@ -31,12 +37,9 @@ function connect() {
     scheduleReconnect();
   });
 
-  // Request initial state
-  try {
-    port.postMessage({ action: "get" });
-  } catch (e) {
-    console.warn("[omarchy] postMessage failed:", e);
-  }
+  // No request needed: the host is push-only. It emits the current theme as soon
+  // as it starts, then again on every theme change (driven by omarchy's
+  // theme-set hook). We never write to the port.
 }
 
 function scheduleReconnect() {
@@ -61,45 +64,16 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     chrome.storage.local.get("theme").then(({ theme }) => sendResponse(theme || null));
     return true;
   }
+  // Kept for content.js, which asks for a guaranteed-current theme right before
+  // driving Slack's Color Mode radio. Storage is already current: omarchy fires
+  // its theme-set hook after the new theme's files are final, the host pushes
+  // immediately, and we write storage on that push — all before the content
+  // script gets the broadcast that makes it ask. So there's nothing to go fetch.
   if (msg && msg.type === "request-fresh-theme") {
-    fetchFreshTheme(sendResponse);
+    chrome.storage.local.get("theme").then(({ theme }) => sendResponse(theme || null));
     return true;
   }
 });
-
-function fetchFreshTheme(callback) {
-  if (!port) {
-    chrome.storage.local.get("theme").then(({ theme }) => callback(theme || null));
-    return;
-  }
-  let done = false;
-  let timeoutId;
-  const oneShot = (theme) => {
-    if (done) return;
-    if (theme && theme.error) return;
-    done = true;
-    clearTimeout(timeoutId);
-    port.onMessage.removeListener(oneShot);
-    callback(theme || null);
-  };
-  port.onMessage.addListener(oneShot);
-  try {
-    port.postMessage({ action: "get" });
-  } catch (e) {
-    if (!done) {
-      done = true;
-      port.onMessage.removeListener(oneShot);
-      chrome.storage.local.get("theme").then(({ theme }) => callback(theme || null));
-    }
-    return;
-  }
-  timeoutId = setTimeout(() => {
-    if (done) return;
-    done = true;
-    port.onMessage.removeListener(oneShot);
-    chrome.storage.local.get("theme").then(({ theme }) => callback(theme || null));
-  }, 1500);
-}
 
 chrome.tabs.onUpdated.addListener((tabId, info, tab) => {
   if (info.status !== "complete") return;

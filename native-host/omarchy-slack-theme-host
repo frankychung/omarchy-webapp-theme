@@ -1,0 +1,293 @@
+#!/bin/bash
+
+# Native messaging host for the Omarchy Slack Theme extension.
+#
+# Reads the active Omarchy theme and reports background / foreground / accent /
+# selection / browser-chrome colors to the extension as length-prefixed JSON on
+# stdout.
+#
+# This host is PUSH-ONLY: it never parses inbound messages. That's a deliberate
+# choice. Reading Chromium's length-prefixed framing in bash means blocking in
+# `head -c4`, which a trap cannot interrupt — so a signal-driven wakeup would
+# need a background reader plus a FIFO. Since omarchy-theme-set already fires
+# `omarchy-hook theme-set` on every switch (see hooks/theme-set.d/), we let the
+# hook signal us with SIGUSR1 instead and drop inbound stdio entirely. The
+# extension gets a push on connect and a push on every theme change, which is
+# all it ever needed.
+#
+# Note this differs from Omarchy's own bundled hosts (omarchy-chromium-copy-url-host,
+# -ytdlp-host): those are one-shot — read a frame, act, exit. We have to stay
+# alive to push, so only their framing idioms carry over, not their structure.
+#
+# Omarchy 4 relocated the 'current' theme state from ~/.config/omarchy/current to
+# the XDG state dir ~/.local/state/omarchy/current. The internal layout is
+# unchanged, so we try the new location first and fall back for pre-4 installs.
+
+set -uo pipefail
+
+STATE_CURRENT="$HOME/.local/state/omarchy/current" # Omarchy 4+
+CONFIG_CURRENT="$HOME/.config/omarchy/current"     # pre-4 fallback
+
+HOOKS_DIR="$HOME/.config/omarchy/hooks"
+HOOK_MARKER="omarchy-slack-theme" # also used by install.sh's legacy block markers
+
+# Omarchy's hook system arrived in v3.1.0 and the hooks/<name>.d/ directory only
+# in v3.8.0, so install.sh wires us up one of two ways depending on the host's
+# Omarchy. Either way we get SIGUSR1 on every theme change and only need a slow
+# safety-net poll. On an Omarchy too old for hooks at all, nothing signals us, so
+# fall back to the ~1s poll this host used before it became push-driven.
+#
+# Checked once at startup; installing the hook later takes effect on next connect.
+hook_installed() {
+  [[ -f "$HOOKS_DIR/theme-set.d/$HOOK_MARKER" ]] && return 0
+  [[ -f "$HOOKS_DIR/theme-set" ]] && grep -qF "$HOOK_MARKER" "$HOOKS_DIR/theme-set" 2>/dev/null
+}
+
+if hook_installed; then
+  POLL_INTERVAL=30
+else
+  POLL_INTERVAL=1
+fi
+
+RUNDIR="${XDG_RUNTIME_DIR:-/tmp}/omarchy-slack-theme"
+PIDFILE="$RUNDIR/$$.pid"
+
+DIRTY=0
+SLEEP_PID=""
+WATCHDOG_PID=""
+
+# ---------------------------------------------------------------- lifecycle --
+
+cleanup() {
+  rm -f "$PIDFILE"
+  [[ -n $SLEEP_PID ]] && kill "$SLEEP_PID" 2>/dev/null
+  [[ -n $WATCHDOG_PID ]] && kill "$WATCHDOG_PID" 2>/dev/null
+  return 0
+}
+
+# ------------------------------------------------------------------ parsing --
+
+trim() {
+  local s="$1"
+  s="${s#"${s%%[![:space:]]*}"}"
+  s="${s%"${s##*[![:space:]]}"}"
+  printf '%s' "$s"
+}
+
+# Locate omarchy's 'current' theme-state dir (Omarchy 4 first, then pre-4) into
+# the global CUR. Sets a global rather than echoing because signature() calls it
+# as often as once a second on hookless installs, and a command substitution
+# would fork a subshell every tick.
+CUR=""
+resolve_current_dir() {
+  local base
+  for base in "$STATE_CURRENT" "$CONFIG_CURRENT"; do
+    if [[ -e "$base/theme" ]]; then
+      CUR="$base"
+      return 0
+    fi
+  done
+  # Neither present — use the Omarchy 4 path so the parsers apply their own
+  # fallbacks (bg -> #1e1e2e, chrome -> empty) rather than erroring.
+  CUR="$STATE_CURRENT"
+}
+
+read_text() {
+  [[ -f $1 ]] || return 0
+  local text
+  text=$(<"$1") || return 0
+  trim "$text"
+}
+
+# The terminal background lives under [colors.primary] in the theme's
+# alacritty.toml. Only that section counts — other sections define their own
+# `background` keys that would otherwise match.
+parse_alacritty_bg() {
+  local file="$1" line s in_primary=0
+  [[ -f $file ]] || return 0
+  while IFS= read -r line || [[ -n $line ]]; do
+    s=$(trim "$line")
+    if [[ $s == \[* ]]; then
+      if [[ $s == "[colors.primary]" ]]; then in_primary=1; else in_primary=0; fi
+      continue
+    fi
+    if ((in_primary)) && [[ $s =~ ^background[[:space:]]*=[[:space:]]*\"(#[0-9a-fA-F]{6,8})\" ]]; then
+      printf '%s' "${BASH_REMATCH[1]}"
+      return 0
+    fi
+  done <"$file"
+}
+
+# colors.toml is a flat list of `name = "#rrggbb"` pairs. Populates COLORS.
+declare -A COLORS=()
+parse_colors_toml() {
+  local file="$1" line s
+  COLORS=()
+  [[ -f $file ]] || return 0
+  while IFS= read -r line || [[ -n $line ]]; do
+    s=$(trim "$line")
+    if [[ $s =~ ^([A-Za-z0-9_]+)[[:space:]]*=[[:space:]]*\"(#[0-9a-fA-F]{6,8})\" ]]; then
+      COLORS["${BASH_REMATCH[1]}"]="${BASH_REMATCH[2]}"
+    fi
+  done <"$file"
+}
+
+# omarchy ships the browser chrome color as 'r,g,b' decimal CSV in chromium.theme.
+# Most stock themes omit the file — omarchy-theme-set-browser then falls back to
+# #1c2027, but we return empty and let the extension pick its own fallback so it
+# can be theme-aware about the choice.
+parse_chromium_theme() {
+  local file="$1" text r g b extra c
+  [[ -f $file ]] || return 0
+  text=$(<"$file") || return 0
+  text=$(trim "$text")
+  IFS=, read -r r g b extra <<<"$text"
+  [[ -n ${extra:-} ]] && return 0
+  r=$(trim "${r:-}") g=$(trim "${g:-}") b=$(trim "${b:-}")
+  for c in "$r" "$g" "$b"; do
+    [[ $c =~ ^[0-9]+$ ]] || return 0
+    ((c >= 0 && c <= 255)) || return 0
+  done
+  printf '#%02x%02x%02x' "$r" "$g" "$b"
+}
+
+# --------------------------------------------------------------------- JSON --
+
+json_escape() {
+  local s="$1"
+  s="${s//\\/\\\\}"
+  s="${s//\"/\\\"}"
+  s="${s//$'\n'/\\n}"
+  s="${s//$'\r'/\\r}"
+  s="${s//$'\t'/\\t}"
+  printf '%s' "$s"
+}
+
+# Emit a JSON string, or bare null when empty — matches the Python host, which
+# sent None for colors the theme didn't define.
+json_value() {
+  if [[ -z ${1:-} ]]; then
+    printf 'null'
+  else
+    printf '"%s"' "$(json_escape "$1")"
+  fi
+}
+
+build_state() {
+  local name bg fg accent selection chrome
+  resolve_current_dir
+
+  name=$(read_text "$CUR/theme.name")
+  bg=$(parse_alacritty_bg "$CUR/theme/alacritty.toml")
+  parse_colors_toml "$CUR/theme/colors.toml"
+  chrome=$(parse_chromium_theme "$CUR/theme/chromium.theme")
+
+  [[ -z $bg ]] && bg="${COLORS[background]:-}"
+  [[ -z $bg ]] && bg="#1e1e2e" # last-resort fallback
+
+  fg="${COLORS[foreground]:-}"
+  accent="${COLORS[accent]:-}"
+  selection="${COLORS[selection_background]:-}"
+
+  # No day/night flag by design — the extension decides dark vs. light purely
+  # from the WCAG relative luminance of bg.
+  printf '{"theme_name":%s,"bg":%s,"fg":%s,"accent":%s,"selection_bg":%s,"chrome":%s}' \
+    "$(json_value "$name")" \
+    "$(json_value "$bg")" \
+    "$(json_value "$fg")" \
+    "$(json_value "$accent")" \
+    "$(json_value "$selection")" \
+    "$(json_value "$chrome")"
+}
+
+# Cheap fingerprint of theme state — changes whenever the active theme does.
+# Used only by the poll path; a SIGUSR1 from the hook pushes unconditionally, so
+# two switches inside one mtime granule still both get through.
+signature() {
+  local out
+  resolve_current_dir
+  # One stat call rather than four — this runs every second on hookless installs.
+  # %n keys each line by filename, so a missing file simply drops out of the
+  # output instead of shifting the remaining values out of alignment.
+  out=$(stat -c '%n=%.9Y' \
+    "$CUR/theme.name" "$CUR/theme/alacritty.toml" \
+    "$CUR/theme/colors.toml" "$CUR/theme/chromium.theme" 2>/dev/null)
+  out="${out//$'\n'/:}"
+  # current/theme is normally a real dir that omarchy-theme-set replaces
+  # wholesale, but older installs symlinked it — capture the target if so.
+  if [[ -L "$CUR/theme" ]]; then
+    out+=":link=$(readlink "$CUR/theme" 2>/dev/null)"
+  else
+    out+=":dir"
+  fi
+  printf '%s' "$out"
+}
+
+# ------------------------------------------------------------------ framing --
+
+# Chromium expects each message prefixed with its byte length as a native-endian
+# (little, on every platform we target) uint32.
+emit() {
+  local json="$1" len
+  len=$(LC_ALL=C printf '%s' "$json" | wc -c)
+  printf '%b%s' \
+    "\\x$(printf '%02x' $((len & 0xff)))\\x$(printf '%02x' $((len >> 8 & 0xff)))\\x$(printf '%02x' $((len >> 16 & 0xff)))\\x$(printf '%02x' $((len >> 24 & 0xff)))" \
+    "$json" || exit 0 # stdout closed: the browser is gone
+}
+
+emit_theme() {
+  local state
+  state=$(build_state) || return 0
+  emit "$state"
+}
+
+# --------------------------------------------------------------------- main --
+
+main() {
+  mkdir -p "$RUNDIR"
+  printf '%s\n' "$$" >"$PIDFILE"
+  trap cleanup EXIT
+  # Exit through the normal path on a signal so the EXIT trap still runs and the
+  # pidfile gets cleaned up; an untrapped SIGTERM would skip it.
+  trap 'exit 0' TERM INT
+  trap 'DIRTY=1' USR1
+
+  local last_sig sig
+  # Push before starting the watchdog below. If stdin is already at EOF the
+  # watchdog fires instantly, and we'd otherwise be killed before saying anything.
+  emit_theme
+  last_sig=$(signature)
+
+  # The browser talks to us by closing the pipe, not by sending anything we care
+  # about. Drain stdin so its writes never block, and exit when it hangs up.
+  #
+  # The `<&3` is load-bearing. Bash gives every background job /dev/null as stdin
+  # unless it's redirected explicitly, so a bare `cat` here would read EOF
+  # instantly and kill us right after the first push — leaving the extension in a
+  # reconnect loop. Duplicating the real stdin onto fd 3 and reading that
+  # overrides the default.
+  exec 3<&0
+  (cat <&3 >/dev/null 2>&1; kill -TERM "$$" 2>/dev/null) &
+  WATCHDOG_PID=$!
+
+  while :; do
+    # `sleep` as a background job + `wait` is the interruptible-sleep idiom:
+    # a trap fires immediately instead of stalling for the full interval.
+    sleep "$POLL_INTERVAL" &
+    SLEEP_PID=$!
+    wait "$SLEEP_PID" 2>/dev/null
+    kill "$SLEEP_PID" 2>/dev/null
+    SLEEP_PID=""
+
+    sig=$(signature)
+    if ((DIRTY)) || [[ $sig != "$last_sig" ]]; then
+      DIRTY=0
+      last_sig=$sig
+      emit_theme
+    fi
+  done
+}
+
+if [[ ${BASH_SOURCE[0]} == "$0" ]]; then
+  main "$@"
+fi

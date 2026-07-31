@@ -1,8 +1,9 @@
 {
   "manifest_version": 3,
   "name": "Omarchy Slack Theme",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Sync the Slack web app's appearance (and main-pane background) with the current Omarchy theme.",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEArJSIwQv/78rvsaA9dVcTZe+lO4JPxjYFOazJiLCsGt7Rp4L6fQy7G6Wllteg/ueE2qWO7NDs0wmNkchE0xjqsPU3BQCzzNM6hevscKdZ0k8QXbEr4L+C+jwC/VPkD73soaKQncnDWtGsA9VLVIom6wWkr0qcop7QNE1+wXdx/n7b/5v192/STiunFMuUNLpEiYzWMwQZtydVtRms1jJvSHE7C9ye9QT6z/dTYJs9LeyREI5HNxzhUMIeWlh44QS6jlf40jnsTJvXJ6FJedQ3C0FhD9i6Tw7+/+XgtU64dQJ2RahP8SpsfHD6TTh4Tfnnw1D6zjjaPyi8pn1DY7nHiQIDAQAB",
   "permissions": ["nativeMessaging", "storage", "tabs"],
   "host_permissions": [
     "*://app.slack.com/*",

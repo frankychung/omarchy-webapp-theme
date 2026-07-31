@@ -100,9 +100,10 @@ function applyTheme(theme) {
   // Drive Slack's actual Color Mode only when the mode crosses light↔dark.
   if (lastSeenIsDark !== isDark) {
     lastSeenIsDark = isDark;
-    // Verify with a fresh native-host read before touching Slack — guards
-    // against a stale cache when the user switches omarchy themes just
-    // before/during a Slack reload.
+    // Re-read the last pushed theme before touching Slack — guards against
+    // acting on a stale in-page value when the user switches omarchy themes
+    // just before/during a Slack reload. The native host pushes on omarchy's
+    // theme-set hook, so what the service worker holds is already current.
     chrome.runtime.sendMessage({ type: "request-fresh-theme" }, (freshTheme) => {
       if (freshTheme && freshTheme.bg) {
         const freshRgb = hexToRgb(freshTheme.bg);
