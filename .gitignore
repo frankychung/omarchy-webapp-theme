@@ -13,6 +13,12 @@ __pycache__/
 *.pyc
 *.pyo
 
-# The generated native-messaging host manifest lives outside this repo at
-# ~/.config/BraveSoftware/Brave-Browser/NativeMessagingHosts/com.omarchy.slack_theme.json
-# (or the equivalent path for Chrome/Chromium) — produced by install.sh.
+# The generated native-messaging host manifests live outside this repo, in each
+# browser's NativeMessagingHosts/ dir — produced by install.sh.
+
+# The private half of the extension signing key. Only the PUBLIC half is checked
+# in (as "key" in extension/manifest.json), which is all that's needed to pin the
+# extension ID. This .pem is required only to package a .crx or claim the same ID
+# on the Chrome Web Store — losing it forfeits that ability permanently, so keep
+# a backup somewhere outside the repo.
+*.pem

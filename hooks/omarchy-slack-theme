@@ -1,0 +1,32 @@
+#!/bin/bash
+
+# Omarchy theme-set hook for the Slack theme extension.
+#
+# omarchy-theme-set runs `omarchy-hook theme-set "$THEME_NAME"` after the new
+# theme's files are final. We nudge every running native-messaging host so it
+# re-reads and pushes to Slack immediately, instead of waiting for its poll.
+#
+# Installed one of two ways depending on the Omarchy version (see install.sh):
+#   - v3.8.0+ / v4 : symlinked to ~/.config/omarchy/hooks/theme-set.d/omarchy-slack-theme
+#   - v3.1.0-v3.7.x: invoked from a marked block in ~/.config/omarchy/hooks/theme-set
+#
+# The hosts are children of the browser, so there can be several at once (one
+# per browser, per profile). Each writes a pidfile on startup; signal them all.
+#
+# Never fail — a hook that exits non-zero makes omarchy-hook print "Hook failed"
+# on every single theme switch.
+
+RUNDIR="${XDG_RUNTIME_DIR:-/tmp}/omarchy-slack-theme"
+
+[[ -d $RUNDIR ]] || exit 0
+
+for pidfile in "$RUNDIR"/*.pid; do
+  [[ -f $pidfile ]] || continue # no matches: the glob stayed literal
+  pid=$(<"$pidfile") || continue
+  # A stale pidfile means the browser died without cleaning up. Drop it.
+  if ! kill -USR1 "$pid" 2>/dev/null; then
+    rm -f "$pidfile"
+  fi
+done
+
+exit 0
