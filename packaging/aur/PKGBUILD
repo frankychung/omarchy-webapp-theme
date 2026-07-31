@@ -18,7 +18,7 @@ optdepends=(
 )
 install="$pkgname.install"
 source=("$pkgname-$pkgver.tar.gz::$url/archive/refs/tags/v$pkgver.tar.gz")
-sha256sums=('SKIP')
+sha256sums=('3a43a53c408fe86afb9c24bcdd4a63f8554f874157950a8d234029755164e830')
 
 package() {
   cd "$srcdir/$pkgname-$pkgver"
