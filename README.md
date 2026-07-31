@@ -78,13 +78,30 @@ background — robust to themes that don't use the obvious day/night naming
 
 ## Install
 
+### From the AUR
+
+```sh
+yay -S omarchy-slack-theme
+omarchy-slack-theme-setup
+```
+
+The package registers the native-messaging host system-wide, so there's no
+per-browser setup. `omarchy-slack-theme-setup` does the two things a package
+can't — installing the omarchy `theme-set` hook and adding `--load-extension` —
+because both live under `$HOME`. It takes the same `--no-flags` and
+`--uninstall` flags as `install.sh` below; they're the same script.
+
+Then fully quit your browser and open `app.slack.com`.
+
+### From a git checkout
+
 ```sh
 ./install.sh
 ```
 
-That's it — there's no extension ID to copy. `extension/manifest.json` pins the
-ID with a `key`, so it's `egagnaecglnnmbbnpbbccgajinplhckp` on every machine,
-and `install.sh` bakes it into the host manifest for you.
+There's no extension ID to copy. `extension/manifest.json` pins the ID with a
+`key`, so it's `egagnaecglnnmbbnpbbccgajinplhckp` on every machine, and
+`install.sh` bakes it into the host manifest for you.
 
 The script does three things:
 
