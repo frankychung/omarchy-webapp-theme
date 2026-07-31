@@ -1,26 +1,67 @@
 #!/bin/bash
-# Install the Omarchy Slack Theme extension: native-messaging host manifests,
-# the omarchy theme-set hook, and the browser --load-extension wiring.
+# Wire up the Omarchy Slack Theme extension for the current user: the omarchy
+# theme-set hook, the browser --load-extension flag, and — outside a packaged
+# install — the native-messaging host manifests.
 #
 # Usage:
 #   ./install.sh [--no-flags] [--uninstall]
 #
 #   --no-flags   Skip editing ~/.config/<browser>-flags.conf. Use this if you'd
-#                rather load extension/ by hand via Developer mode.
+#                rather load the extension by hand via Developer mode.
 #   --uninstall  Reverse everything this script installs.
 #
 # No extension ID argument: extension/manifest.json pins the ID with a "key",
 # so it's the same on every machine and is baked into the host manifest.
+#
+# This same script ships twice: as ./install.sh in a git checkout, and as
+# /usr/bin/omarchy-slack-theme-setup in the AUR package. It figures out which it
+# is from its own path, so there's only ever one copy of this logic to maintain.
 
 set -euo pipefail
 
-REPO="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-HOST_SCRIPT="$REPO/native-host/omarchy-slack-theme-host"
-HOST_TEMPLATE="$REPO/native-host/com.omarchy.slack_theme.json.template"
-HOOK_SCRIPT="$REPO/hooks/omarchy-slack-theme"
-EXT_DIR="$REPO/extension"
+SELF="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/$(basename -- "${BASH_SOURCE[0]}")"
+SHARE_DIR="/usr/share/omarchy-slack-theme"
+
+REPO="$(dirname -- "$SELF")"
+
+# Decide by what's actually next to us, not by our own filename — a checkout can
+# be cloned to any directory, and the package may be installed at the same time.
+if [[ -f "$REPO/native-host/omarchy-slack-theme-host" ]]; then
+  # Git checkout: everything lives beside this script, and we own the per-user
+  # native-messaging manifests too since there's no package to place them.
+  PACKAGED=0
+  HOST_SCRIPT="$REPO/native-host/omarchy-slack-theme-host"
+  HOST_TEMPLATE="$REPO/native-host/com.omarchy.slack_theme.json.template"
+  HOOK_SCRIPT="$REPO/hooks/omarchy-slack-theme"
+  EXT_DIR="$REPO/extension"
+elif [[ -d $SHARE_DIR ]]; then
+  # Packaged: pacman owns the host binary and the system-wide manifests under
+  # /etc, so all that's left for us is the per-user wiring.
+  PACKAGED=1
+  HOST_SCRIPT="/usr/bin/omarchy-slack-theme-host"
+  HOST_TEMPLATE=""
+  HOOK_SCRIPT="$SHARE_DIR/hooks/omarchy-slack-theme"
+  EXT_DIR="$SHARE_DIR/extension"
+else
+  echo "Error: can't find the extension files (looked beside $SELF and in $SHARE_DIR)." >&2
+  exit 1
+fi
 
 HOST_NAME="com.omarchy.slack_theme"
+
+# The pinned extension ID, read back from whichever manifest this mode has so
+# it stays single-sourced rather than duplicated here. Purely cosmetic — it's
+# only used in the closing message — so a missing file must not be fatal.
+ext_id() {
+  local src
+  for src in "${HOST_TEMPLATE:-}" \
+    "/etc/chromium/native-messaging-hosts/$HOST_NAME.json"; do
+    [[ -n $src && -f $src ]] || continue
+    grep -o 'chrome-extension://[a-p]*' "$src" | head -1 | sed 's|chrome-extension://||'
+    return 0
+  done
+  printf 'the pinned ID'
+}
 MARKER="omarchy-slack-theme"
 BEGIN_MARK="# >>> $MARKER >>>"
 END_MARK="# <<< $MARKER <<<"
@@ -225,24 +266,33 @@ remove_flags() {
 
 if ((DO_UNINSTALL)); then
   echo "Uninstalling Omarchy Slack Theme..."
-  remove_host_manifests
+  ((PACKAGED)) || remove_host_manifests
   remove_hook
   remove_flags
   echo
-  echo "Done. Fully restart your browser to finish."
+  if ((PACKAGED)); then
+    echo "Done. Fully restart your browser, then 'pacman -R omarchy-slack-theme'"
+    echo "to remove the package itself."
+  else
+    echo "Done. Fully restart your browser to finish."
+  fi
   exit 0
 fi
 
-for f in "$HOST_SCRIPT" "$HOST_TEMPLATE" "$HOOK_SCRIPT"; do
+for f in "$HOST_SCRIPT" "$HOOK_SCRIPT" ${HOST_TEMPLATE:+"$HOST_TEMPLATE"}; do
   [[ -f $f ]] || {
     echo "Error: missing $f" >&2
     exit 1
   }
 done
-chmod +x "$HOST_SCRIPT" "$HOOK_SCRIPT" 2>/dev/null || true
+((PACKAGED)) || chmod +x "$HOST_SCRIPT" "$HOOK_SCRIPT" 2>/dev/null || true
 
-echo "Installing Omarchy Slack Theme..."
-install_host_manifests
+echo "Setting up Omarchy Slack Theme..."
+if ((PACKAGED)); then
+  echo "  native-messaging host: /etc/chromium/native-messaging-hosts (owned by the package)"
+else
+  install_host_manifests
+fi
 install_hook
 if ((DO_FLAGS)); then
   install_flags
@@ -256,7 +306,7 @@ echo "  1. Fully quit your browser (pkill brave), don't just close the window."
 if ((DO_FLAGS)); then
   echo "  2. If you previously loaded extension/ by hand via Developer mode,"
   echo "     remove it first — it and the --load-extension copy share the pinned"
-  echo "     ID $(grep -o 'chrome-extension://[a-p]*' "$HOST_TEMPLATE" | head -1 | sed 's|chrome-extension://||')"
+  echo "     ID $(ext_id)"
   echo "     and only one of them will load."
 else
   echo "  2. Load $EXT_DIR unpacked via Developer mode."
