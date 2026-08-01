@@ -11,7 +11,7 @@ license=('MIT')
 # only thing worth declaring.
 depends=('bash')
 optdepends=(
-  'omarchy: instant updates via the theme-set hook (without it the host polls)'
+  'omarchy: Omarchy 4+ required -- provides the theme it reads and the theme-set hook'
   'chromium: supported browser'
   'brave-bin: supported browser'
   'google-chrome: supported browser'

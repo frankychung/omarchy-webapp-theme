@@ -9,58 +9,31 @@
 # This host is PUSH-ONLY: it never parses inbound messages. That's a deliberate
 # choice. Reading Chromium's length-prefixed framing in bash means blocking in
 # `head -c4`, which a trap cannot interrupt — so a signal-driven wakeup would
-# need a background reader plus a FIFO. Since omarchy-theme-set already fires
-# `omarchy-hook theme-set` on every switch (see hooks/theme-set.d/), we let the
-# hook signal us with SIGUSR1 instead and drop inbound stdio entirely. The
-# extension gets a push on connect and a push on every theme change, which is
-# all it ever needed.
+# need a background reader plus a FIFO. Instead the omarchy theme-set hook
+# (hooks/omarchy-slack-theme, installed by install.sh into theme-set.d/) signals
+# us with SIGUSR1, and we drop inbound stdio entirely. The extension gets a push
+# on connect and a push on every theme change.
 #
-# Note this differs from Omarchy's own bundled hosts (omarchy-chromium-copy-url-host,
-# -ytdlp-host): those are one-shot — read a frame, act, exit. We have to stay
-# alive to push, so only their framing idioms carry over, not their structure.
-#
-# Omarchy 4 relocated the 'current' theme state from ~/.config/omarchy/current to
-# the XDG state dir ~/.local/state/omarchy/current. The internal layout is
-# unchanged, so we try the new location first and fall back for pre-4 installs.
+# Omarchy 4+ only. The hook (theme-set.d, present since Omarchy 3.8) is what
+# drives updates, so there's no polling fallback — a SIGUSR1 always arrives on a
+# switch. Older Omarchy should stay on the pre-0.3 release.
 
 set -uo pipefail
 
-STATE_CURRENT="$HOME/.local/state/omarchy/current" # Omarchy 4+
-CONFIG_CURRENT="$HOME/.config/omarchy/current"     # pre-4 fallback
+# Omarchy 4 keeps the active theme state here; theme/ is a directory omarchy
+# replaces wholesale on every switch.
+CURRENT="$HOME/.local/state/omarchy/current"
 
-HOOKS_DIR="$HOME/.config/omarchy/hooks"
-HOOK_MARKER="omarchy-slack-theme" # also used by install.sh's legacy block markers
-
-# Omarchy's hook system arrived in v3.1.0 and the hooks/<name>.d/ directory only
-# in v3.8.0, so install.sh wires us up one of two ways depending on the host's
-# Omarchy. Either way we get SIGUSR1 on every theme change and only need a slow
-# safety-net poll. On an Omarchy too old for hooks at all, nothing signals us, so
-# fall back to the ~1s poll this host used before it became push-driven.
-#
-# Checked once at startup; installing the hook later takes effect on next connect.
-hook_installed() {
-  [[ -f "$HOOKS_DIR/theme-set.d/$HOOK_MARKER" ]] && return 0
-  [[ -f "$HOOKS_DIR/theme-set" ]] && grep -qF "$HOOK_MARKER" "$HOOKS_DIR/theme-set" 2>/dev/null
-}
-
-if hook_installed; then
-  POLL_INTERVAL=30
-else
-  POLL_INTERVAL=1
-fi
-
+# Pidfiles live here so the theme-set hook can SIGUSR1 every running host.
 RUNDIR="${XDG_RUNTIME_DIR:-/tmp}/omarchy-slack-theme"
 PIDFILE="$RUNDIR/$$.pid"
 
-DIRTY=0
-SLEEP_PID=""
 WATCHDOG_PID=""
 
 # ---------------------------------------------------------------- lifecycle --
 
 cleanup() {
   rm -f "$PIDFILE"
-  [[ -n $SLEEP_PID ]] && kill "$SLEEP_PID" 2>/dev/null
   [[ -n $WATCHDOG_PID ]] && kill "$WATCHDOG_PID" 2>/dev/null
   return 0
 }
@@ -72,24 +45,6 @@ trim() {
   s="${s#"${s%%[![:space:]]*}"}"
   s="${s%"${s##*[![:space:]]}"}"
   printf '%s' "$s"
-}
-
-# Locate omarchy's 'current' theme-state dir (Omarchy 4 first, then pre-4) into
-# the global CUR. Sets a global rather than echoing because signature() calls it
-# as often as once a second on hookless installs, and a command substitution
-# would fork a subshell every tick.
-CUR=""
-resolve_current_dir() {
-  local base
-  for base in "$STATE_CURRENT" "$CONFIG_CURRENT"; do
-    if [[ -e "$base/theme" ]]; then
-      CUR="$base"
-      return 0
-    fi
-  done
-  # Neither present — use the Omarchy 4 path so the parsers apply their own
-  # fallbacks (bg -> #1e1e2e, chrome -> empty) rather than erroring.
-  CUR="$STATE_CURRENT"
 }
 
 read_text() {
@@ -163,8 +118,8 @@ json_escape() {
   printf '%s' "$s"
 }
 
-# Emit a JSON string, or bare null when empty — matches the Python host, which
-# sent None for colors the theme didn't define.
+# Emit a JSON string, or bare null when empty, so the extension can tell "theme
+# didn't define this color" from "empty string".
 json_value() {
   if [[ -z ${1:-} ]]; then
     printf 'null'
@@ -175,12 +130,11 @@ json_value() {
 
 build_state() {
   local name bg fg accent selection chrome
-  resolve_current_dir
 
-  name=$(read_text "$CUR/theme.name")
-  bg=$(parse_alacritty_bg "$CUR/theme/alacritty.toml")
-  parse_colors_toml "$CUR/theme/colors.toml"
-  chrome=$(parse_chromium_theme "$CUR/theme/chromium.theme")
+  name=$(read_text "$CURRENT/theme.name")
+  bg=$(parse_alacritty_bg "$CURRENT/theme/alacritty.toml")
+  parse_colors_toml "$CURRENT/theme/colors.toml"
+  chrome=$(parse_chromium_theme "$CURRENT/theme/chromium.theme")
 
   [[ -z $bg ]] && bg="${COLORS[background]:-}"
   [[ -z $bg ]] && bg="#1e1e2e" # last-resort fallback
@@ -198,29 +152,6 @@ build_state() {
     "$(json_value "$accent")" \
     "$(json_value "$selection")" \
     "$(json_value "$chrome")"
-}
-
-# Cheap fingerprint of theme state — changes whenever the active theme does.
-# Used only by the poll path; a SIGUSR1 from the hook pushes unconditionally, so
-# two switches inside one mtime granule still both get through.
-signature() {
-  local out
-  resolve_current_dir
-  # One stat call rather than four — this runs every second on hookless installs.
-  # %n keys each line by filename, so a missing file simply drops out of the
-  # output instead of shifting the remaining values out of alignment.
-  out=$(stat -c '%n=%.9Y' \
-    "$CUR/theme.name" "$CUR/theme/alacritty.toml" \
-    "$CUR/theme/colors.toml" "$CUR/theme/chromium.theme" 2>/dev/null)
-  out="${out//$'\n'/:}"
-  # current/theme is normally a real dir that omarchy-theme-set replaces
-  # wholesale, but older installs symlinked it — capture the target if so.
-  if [[ -L "$CUR/theme" ]]; then
-    out+=":link=$(readlink "$CUR/theme" 2>/dev/null)"
-  else
-    out+=":dir"
-  fi
-  printf '%s' "$out"
 }
 
 # ------------------------------------------------------------------ framing --
@@ -245,47 +176,37 @@ emit_theme() {
 
 main() {
   mkdir -p "$RUNDIR"
-  printf '%s\n' "$$" >"$PIDFILE"
+  # Arm signal handlers before publishing the pidfile, so the hook can't SIGUSR1
+  # us during a window where USR1 still has its default (fatal) disposition.
   trap cleanup EXIT
   # Exit through the normal path on a signal so the EXIT trap still runs and the
   # pidfile gets cleaned up; an untrapped SIGTERM would skip it.
   trap 'exit 0' TERM INT
-  trap 'DIRTY=1' USR1
+  # The theme-set hook fires this on every switch → push the new theme.
+  trap 'emit_theme' USR1
 
-  local last_sig sig
-  # Push before starting the watchdog below. If stdin is already at EOF the
-  # watchdog fires instantly, and we'd otherwise be killed before saying anything.
+  printf '%s\n' "$$" >"$PIDFILE"
+
+  # Push the current theme immediately on connect, before arming the watchdog —
+  # if stdin is already at EOF the watchdog fires at once, and we'd otherwise be
+  # killed before saying anything.
   emit_theme
-  last_sig=$(signature)
 
   # The browser talks to us by closing the pipe, not by sending anything we care
   # about. Drain stdin so its writes never block, and exit when it hangs up.
   #
-  # The `<&3` is load-bearing. Bash gives every background job /dev/null as stdin
-  # unless it's redirected explicitly, so a bare `cat` here would read EOF
-  # instantly and kill us right after the first push — leaving the extension in a
-  # reconnect loop. Duplicating the real stdin onto fd 3 and reading that
-  # overrides the default.
+  # The `<&3` is load-bearing. Bash gives every background job `/dev/null` as
+  # stdin unless it's redirected explicitly, so a bare read loop here would see
+  # EOF instantly and kill us right after the first push — leaving the extension
+  # in a reconnect loop. Duplicating the real stdin onto fd 3 overrides that.
   exec 3<&0
-  (cat <&3 >/dev/null 2>&1; kill -TERM "$$" 2>/dev/null) &
+  (while IFS= read -r _; do :; done <&3; kill -TERM "$$" 2>/dev/null) &
   WATCHDOG_PID=$!
 
-  while :; do
-    # `sleep` as a background job + `wait` is the interruptible-sleep idiom:
-    # a trap fires immediately instead of stalling for the full interval.
-    sleep "$POLL_INTERVAL" &
-    SLEEP_PID=$!
-    wait "$SLEEP_PID" 2>/dev/null
-    kill "$SLEEP_PID" 2>/dev/null
-    SLEEP_PID=""
-
-    sig=$(signature)
-    if ((DIRTY)) || [[ $sig != "$last_sig" ]]; then
-      DIRTY=0
-      last_sig=$sig
-      emit_theme
-    fi
-  done
+  # Stay alive until the browser closes the pipe. A SIGUSR1 interrupts `wait`,
+  # runs the USR1 trap to push, and we resume waiting; when the watchdog exits
+  # (browser gone) `wait` succeeds and we fall through to the EXIT trap.
+  while ! wait "$WATCHDOG_PID"; do :; done
 }
 
 if [[ ${BASH_SOURCE[0]} == "$0" ]]; then

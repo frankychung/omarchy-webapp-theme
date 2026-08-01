@@ -63,8 +63,6 @@ ext_id() {
   printf 'the pinned ID'
 }
 MARKER="omarchy-slack-theme"
-BEGIN_MARK="# >>> $MARKER >>>"
-END_MARK="# <<< $MARKER <<<"
 
 HOOKS_DIR="$HOME/.config/omarchy/hooks"
 
@@ -154,66 +152,20 @@ remove_host_manifests() {
 
 # --------------------------------------------------------------------- hook --
 
-# Where is omarchy-hook, and does it support hooks/<name>.d/ directories?
-# The .d form landed in Omarchy v3.8.0; v3.1.0-v3.7.x only run the single
-# hooks/<name> file, and anything older has no hooks at all.
-find_omarchy_hook() {
-  local c
-  for c in "$(command -v omarchy-hook 2>/dev/null || true)" \
-    "${OMARCHY_PATH:-}/bin/omarchy-hook" \
-    "/usr/share/omarchy/bin/omarchy-hook"; do
-    [[ -n $c && -f $c ]] && {
-      printf '%s' "$c"
-      return 0
-    }
-  done
-  return 1
-}
-
+# Omarchy runs every script in hooks/theme-set.d/ on a theme switch (the .d form
+# has been there since Omarchy 3.8, so it's always present on the Omarchy 4+ this
+# targets). We symlink our hook in; it SIGUSR1s every running host so the
+# extension repaints the instant you switch themes.
 install_hook() {
-  local hook_bin
-  if ! hook_bin=$(find_omarchy_hook); then
-    echo "  omarchy-hook not found — skipping hook install."
-    echo "  The host will fall back to a 1s poll, so theming still works."
-    return 0
-  fi
-
-  if grep -q 'HOOK_DIR' "$hook_bin"; then
-    mkdir -p "$HOOKS_DIR/theme-set.d"
-    ln -sfn "$HOOK_SCRIPT" "$HOOKS_DIR/theme-set.d/$MARKER"
-    echo "  hook symlinked into hooks/theme-set.d/ (Omarchy 3.8+/4)"
-    return 0
-  fi
-
-  # Legacy single-file hook. This file may already be the user's own, so append a
-  # marked block rather than overwriting — uninstall strips exactly that block.
-  local target="$HOOKS_DIR/theme-set"
-  mkdir -p "$HOOKS_DIR"
-  if [[ -f $target ]] && grep -qF "$MARKER" "$target"; then
-    echo "  hook already present in hooks/theme-set"
-    return 0
-  fi
-  if [[ ! -f $target ]]; then
-    printf '#!/bin/bash\n' >"$target"
-  fi
-  {
-    printf '\n%s\n' "$BEGIN_MARK"
-    printf '"%s" "$@" || true\n' "$HOOK_SCRIPT"
-    printf '%s\n' "$END_MARK"
-  } >>"$target"
-  chmod +x "$target"
-  echo "  hook appended to hooks/theme-set (Omarchy 3.1-3.7, no .d support)"
+  mkdir -p "$HOOKS_DIR/theme-set.d"
+  ln -sfn "$HOOK_SCRIPT" "$HOOKS_DIR/theme-set.d/$MARKER"
+  echo "  hook symlinked into hooks/theme-set.d/"
 }
 
 remove_hook() {
-  local target="$HOOKS_DIR/theme-set"
   if [[ -L "$HOOKS_DIR/theme-set.d/$MARKER" || -f "$HOOKS_DIR/theme-set.d/$MARKER" ]]; then
     rm -f "$HOOKS_DIR/theme-set.d/$MARKER"
     echo "  removed hooks/theme-set.d/$MARKER"
-  fi
-  if [[ -f $target ]] && grep -qF "$MARKER" "$target"; then
-    sed -i "\|^$BEGIN_MARK\$|,\|^$END_MARK\$|d" "$target"
-    echo "  stripped the $MARKER block from hooks/theme-set"
   fi
 }
 

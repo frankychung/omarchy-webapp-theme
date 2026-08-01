@@ -8,10 +8,9 @@ A small **Manifest V3 browser extension** (Brave/Chrome/Chromium) that makes the
 **Slack web app** (`app.slack.com`) follow the current [Omarchy](https://omarchy.org/)
 theme. It repaints Slack's chrome/sidebar/message pane to match the terminal
 background and auto-flips Slack's Light/Dark Color Mode when you switch omarchy
-themes. A **bash native-messaging host** reads the active Omarchy theme
-(Omarchy 4's `~/.local/state/omarchy/current/`, or the pre-4
-`~/.config/omarchy/current/` location — same internal layout, relocated to the
-XDG state dir) and pushes theme changes to the extension the moment they land.
+themes. A **bash native-messaging host** reads the active Omarchy theme from
+`~/.local/state/omarchy/current/` and pushes theme changes to the extension the
+moment they land. **Requires Omarchy 4+.**
 
 This is end-user desktop tooling, not a web service. There is no build step, no
 package manager, and no test suite — it's plain JS plus a dependency-free bash
@@ -55,18 +54,15 @@ never writes to the port. Reading Chromium's length-prefixed framing in bash
 means blocking in `head -c4`, which a trap can't interrupt; going push-only
 removes the need entirely. Consequences to preserve when editing:
 
-- Wakeups come from SIGUSR1 (the hook), using the `sleep & wait` interruptible-
-  sleep idiom. A plain `sleep` would stall the trap for the full interval.
+- **Omarchy 4+ only.** The host reads `~/.local/state/omarchy/current/` and is
+  driven entirely by SIGUSR1 from the theme-set hook — there is no polling
+  fallback. `install.sh` symlinks the hook into `hooks/theme-set.d/` (the `.d`
+  form has existed since Omarchy 3.8). Older Omarchy stays on the pre-0.3 release.
+- The main loop `wait`s on the stdin watchdog; a SIGUSR1 interrupts the `wait`,
+  the trap pushes the new theme, and the loop resumes. No `sleep` timers.
 - The stdin watchdog **must** read via an explicit `<&3` dup. Bash gives every
-  background job `/dev/null` as stdin, so a bare `cat` EOFs instantly and kills
-  the host right after its first push.
-- Poll interval is adaptive: 30s when the hook is installed, 1s when it isn't
-  (Omarchy < v3.1.0 has no hook system).
-
-**Omarchy version support matters** — this must keep working on Omarchy 3.
-`omarchy-hook` arrived in v3.1.0 but `hooks/<name>.d/` only in v3.8.0, so
-`install.sh` falls back to appending a marked block to the single-file
-`hooks/theme-set`. Never overwrite that file; users keep their own hooks there.
+  background job `/dev/null` as stdin, so a bare read loop EOFs instantly and
+  kills the host right after its first push.
 
 ## content.js structure
 
@@ -148,9 +144,7 @@ HOME=/tmp/fake ./install.sh && HOME=/tmp/fake ./install.sh --uninstall
 ```
 
 Point `~/.local/state/omarchy/current/theme` at any dir under
-`/usr/share/omarchy/themes/` to exercise a specific palette. Shadowing
-`omarchy-hook` on `$PATH` with a version lacking `HOOK_DIR` exercises the
-Omarchy 3.1–3.7 install path.
+`/usr/share/omarchy/themes/` to exercise a specific palette.
 
 ## Conventions
 
