@@ -4,7 +4,7 @@
   "version": "0.2.0",
   "description": "Sync the Slack web app's appearance (and main-pane background) with the current Omarchy theme.",
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEArJSIwQv/78rvsaA9dVcTZe+lO4JPxjYFOazJiLCsGt7Rp4L6fQy7G6Wllteg/ueE2qWO7NDs0wmNkchE0xjqsPU3BQCzzNM6hevscKdZ0k8QXbEr4L+C+jwC/VPkD73soaKQncnDWtGsA9VLVIom6wWkr0qcop7QNE1+wXdx/n7b/5v192/STiunFMuUNLpEiYzWMwQZtydVtRms1jJvSHE7C9ye9QT6z/dTYJs9LeyREI5HNxzhUMIeWlh44QS6jlf40jnsTJvXJ6FJedQ3C0FhD9i6Tw7+/+XgtU64dQJ2RahP8SpsfHD6TTh4Tfnnw1D6zjjaPyi8pn1DY7nHiQIDAQAB",
-  "permissions": ["nativeMessaging", "storage", "tabs"],
+  "permissions": ["nativeMessaging", "storage"],
   "host_permissions": [
     "*://app.slack.com/*",
     "*://*.slack.com/*"
@@ -22,7 +22,12 @@
     },
     {
       "matches": ["*://app.slack.com/*", "*://*.slack.com/*"],
-      "js": ["content.js"],
+      "js": [
+        "omarchy-colors.js",
+        "omarchy-surfaces.js",
+        "omarchy-runtime.js",
+        "content.js"
+      ],
       "run_at": "document_start",
       "all_frames": false
     }

@@ -165,12 +165,13 @@ etc. — each block is annotated.
 
 Common tweaks:
 
-- **Sidebar shade**: change `dir * 0.04` (in the `sidebarBg` calculation
-  near the top of `applyTheme`) to a bigger number for more contrast.
-- **Selected channel highlight**: search for `withAlpha(accent, 0.35)` — that's
-  the selected-row tint. Drop to 0.2 for subtler, raise for more punch.
+- **Sidebar shade**: change `dir * 0.04` (in the `sidebarBg` calculation in
+  `extension/omarchy-surfaces.js`) to a bigger number for more contrast.
+- **Selected channel highlight**: search for `withAlpha(accent, 0.35)` in
+  `omarchy-surfaces.js` — that's the selected-row tint. Drop to 0.2 for subtler,
+  raise for more punch.
 - **Use day/night nomenclature instead of luminance**: replace the
-  `relLuminance(...) < 0.5` check in `applyTheme` with `theme.is_night`.
+  `relLuminance(...) < 0.5` check in `omarchy-surfaces.js` with `theme.is_night`.
 
 After editing, reload the extension on `brave://extensions` and refresh the
 Slack tab.
@@ -200,8 +201,11 @@ Slack tab.
 extension/
 ├── manifest.json                   # MV3 manifest; pins the extension ID via "key"
 ├── background.js                   # service worker; holds the native port
-├── content.js                      # injects CSS + drives prefs automation
-└── inject-prefers-color-scheme.js  # MAIN-world bridge: matchMedia shim + React onClick
+├── omarchy-colors.js               # engine: color helpers (linearized WCAG luminance)
+├── omarchy-surfaces.js             # engine: deriveSurfaces() -- theme -> surfaces
+├── omarchy-runtime.js              # engine: OmarchyTheme registry + theme dispatch
+├── content.js                      # the Slack pack: injects CSS + drives prefs automation
+└── inject-prefers-color-scheme.js  # MAIN-world: matchMedia polyfill + React-click bridge
 
 native-host/
 ├── omarchy-slack-theme-host        # bash; pushes length-prefixed JSON over stdio

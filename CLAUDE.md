@@ -20,14 +20,21 @@ script.
 ## Layout
 
 - `extension/` — the unpacked extension
-  - `content.js` — **the bulk of the work.** Builds the themed CSS from the
-    pushed theme and injects it; also drives Slack's Preferences modal to flip
-    Color Mode. See "content.js structure" below.
+  - `omarchy-colors.js` / `omarchy-surfaces.js` / `omarchy-runtime.js` — the
+    app-agnostic engine (loaded before `content.js`, shares its scope): color
+    helpers (`relLuminance` linearizes channels per WCAG), `deriveSurfaces()`
+    (the theme→surfaces contract), and the `OmarchyTheme` registry that receives
+    themes and dispatches to the registered pack.
+  - `content.js` — **the Slack pack**, and the bulk of the work. Builds the
+    themed CSS from the derived surfaces and injects it; drives Slack's
+    Preferences modal to flip Color Mode; registers via `OmarchyTheme.register()`.
+    See "content.js structure" below.
   - `background.js` — MV3 service worker. Holds the native-messaging port,
     rebroadcasts pushed themes to Slack tabs, answers `request-fresh-theme`.
   - `inject-prefers-color-scheme.js` — runs in the page's MAIN world at
-    `document_start`; spoofs `matchMedia('(prefers-color-scheme)')` so Slack's
-    "Sync with OS" appearance follows omarchy instead of the OS.
+    `document_start`; a near-complete `matchMedia('(prefers-color-scheme)')`
+    polyfill so Slack's "Sync with OS" appearance follows omarchy, plus the
+    Slack-only `omarchy:react-click` bridge that drives the Preferences radio.
   - `manifest.json` — permissions + content-script registration. Carries a
     **`key`** that pins the extension ID to `egagnaecglnnmbbnpbbccgajinplhckp`
     on every machine, so the host manifest's `allowed_origins` can be hardcoded.
@@ -63,12 +70,17 @@ removes the need entirely. Consequences to preserve when editing:
 
 ## content.js structure
 
-1. **Color helpers** — `hexToRgb`, `relLuminance`, `shade`, `withAlpha`, `mix`.
-   Dark vs. light is decided by **WCAG relative luminance** of the terminal bg
-   (`< 0.5` = dark), *not* by the theme's day/night name.
-2. **`applyTheme(theme)`** — derives surfaces (`sidebarBg`, `chromeBg`,
-   `hoverBg`, `selectedBg`, …) from `theme.bg/fg/accent/chrome`, then builds one
-   big CSS template string and injects it into a `<style id="omarchy-slack-style">`.
+1. **Engine** (`omarchy-colors.js` / `omarchy-surfaces.js` / `omarchy-runtime.js`,
+   loaded before `content.js`) — color helpers (`hexToRgb`, `relLuminance`
+   [linearized WCAG channels], `shade`, `withAlpha`, `mix`), `deriveSurfaces()`,
+   and the `OmarchyTheme` registry. Dark vs. light is decided by **WCAG relative
+   luminance** of the terminal bg (`< 0.5` = dark), *not* the day/night name.
+   `content.js` is the Slack **pack**: it ends with `OmarchyTheme.register(...)`.
+2. **`applySlackTheme(theme, s)`** (the pack's `apply` hook) — takes the surfaces
+   `s` the engine derived (`sidebarBg`, `chromeBg`, `hoverBg`, `selectedBg`, …).
+   **Destructure every field the CSS/`directPaint` uses — a missing one is a
+   silent runtime ReferenceError** (this bit us with `chromeBg`). Then it builds
+   one big CSS template string and injects it into a `<style id="omarchy-slack-style">`.
 3. **Inline-important overrides** — Slack sets its own high-specificity inline
    styles (CSS custom props like `--rainbow-*`, `--saf-*`, and direct
    `background-color` on the rail/sidebar/nav on blur). External `!important` CSS

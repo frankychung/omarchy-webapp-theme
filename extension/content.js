@@ -1,135 +1,25 @@
+// Slack theme pack for the Omarchy web-app theming engine.
+//
+// Registers with the generic engine (omarchy-runtime.js, loaded before this)
+// and owns everything Slack-specific: building the themed CSS, the inline
+// re-paints that beat Slack's cascade, and the Color Mode automation. The
+// color helpers (hexToRgb/shade/withAlpha/mix/relLuminance) and deriveSurfaces
+// live in omarchy-colors.js / omarchy-surfaces.js and are shared in this
+// content script's scope. The register() call is at the bottom of the file.
 const STYLE_ID = "omarchy-slack-style";
-let lastAppliedThemeKey = null;
-let lastAppliedTheme = null;
-let lastSeenIsDark = null;
 
 // Clear any stale cached mode from earlier extension versions.
 try { chrome.storage.local.remove("lastSlackMode"); } catch (_) {}
 
-function hexToRgb(hex) {
-  // Accept rgb(r, g, b) too — shade() emits that form, and we sometimes
-  // chain shade() output back through mix()/withAlpha().
-  if (typeof hex === "string" && hex.startsWith("rgb")) {
-    const m = hex.match(/\d+/g);
-    if (m && m.length >= 3) {
-      return { r: +m[0], g: +m[1], b: +m[2] };
-    }
-    return null;
-  }
-  const h = (hex || "").replace("#", "");
-  if (h.length < 6) return null;
-  return {
-    r: parseInt(h.slice(0, 2), 16),
-    g: parseInt(h.slice(2, 4), 16),
-    b: parseInt(h.slice(4, 6), 16),
-  };
-}
-
-function relLuminance({ r, g, b }) {
-  return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
-}
-
-function shade(hex, delta) {
-  const c = hexToRgb(hex);
-  if (!c) return hex;
-  const f = (v) => Math.max(0, Math.min(255, Math.round(v + delta * 255)));
-  return `rgb(${f(c.r)}, ${f(c.g)}, ${f(c.b)})`;
-}
-
-function withAlpha(hex, alpha) {
-  const c = hexToRgb(hex);
-  if (!c) return hex;
-  return `rgba(${c.r}, ${c.g}, ${c.b}, ${alpha})`;
-}
-
-function mix(hexA, hexB, t) {
-  const a = hexToRgb(hexA);
-  const b = hexToRgb(hexB);
-  if (!a || !b) return hexA;
-  const r = Math.round(a.r * (1 - t) + b.r * t);
-  const g = Math.round(a.g * (1 - t) + b.g * t);
-  const bl = Math.round(a.b * (1 - t) + b.b * t);
-  return `rgb(${r}, ${g}, ${bl})`;
-}
-
-function applyTheme(theme) {
+// The engine's apply() hook: paint Slack from the surfaces deriveSurfaces()
+// produced. `dir` and the color helpers (shade/withAlpha) are used inline in
+// the CSS template below, so pull them into scope alongside the surfaces.
+function applySlackTheme(theme, s) {
   if (!theme || !theme.bg) return;
-  const bgRgb = hexToRgb(theme.bg);
-  if (!bgRgb) return;
-
-  // Skip if nothing changed since last apply.
-  const key = JSON.stringify(theme);
-  if (key === lastAppliedThemeKey) return;
-  lastAppliedThemeKey = key;
-  lastAppliedTheme = theme;
-
-  const isDark = relLuminance(bgRgb) < 0.5;
-  const fg = theme.fg || (isDark ? "#e6e6e6" : "#1f1f1f");
-  const accent = theme.accent || (isDark ? "#7aa2f7" : "#1264a3");
-
-  // delta direction: lighter shades on dark themes, darker shades on light themes
-  const dir = isDark ? +1 : -1;
-  // Two surfaces:
-  //  - sidebarBg: the channel list. Subtly accent-tinted so the workspace
-  //    feels theme-aware. Kept light — heavier mixes flood the chrome on
-  //    warm/saturated accents.
-  //  - chromeBg: outer-app chrome (tab rail + top nav). Uses omarchy's
-  //    chromium.theme when the theme ships one, so Slack matches Brave's
-  //    toolbar tint. Falls back to sidebarBg when absent — keeps fg
-  //    contrast correct on light themes.
-  const sidebarBg = mix(shade(theme.bg, dir * 0.04), accent, isDark ? 0.10 : 0.06);
-  const chromeBg = theme.chrome || sidebarBg;
-  const railBg = chromeBg;
-  const navBg = chromeBg;
-  const sidebarFg = fg;
-  const sidebarMuted = withAlpha(fg, 0.65);
-  // Stronger than fg: push toward white on dark themes / black on light themes.
-  // Used for unread channel rows so they read brighter than read rows.
-  const fgStrong = shade(fg, dir * 0.125);
-  const hoverBg = withAlpha(accent, 0.20);
-  const selectedBg = withAlpha(accent, 0.35);
-  const borderColor = withAlpha(fg, 0.08);
-
-  document.documentElement.style.colorScheme = isDark ? "dark" : "light";
-
-  // Harmless if Slack ever adds an OS-sync option.
-  document.dispatchEvent(
-    new CustomEvent("omarchy:set-color-scheme", { detail: { dark: isDark } })
-  );
-
-  // Drive Slack's actual Color Mode only when the mode crosses light↔dark.
-  if (lastSeenIsDark !== isDark) {
-    lastSeenIsDark = isDark;
-    // Re-read the last pushed theme before touching Slack — guards against
-    // acting on a stale in-page value when the user switches omarchy themes
-    // just before/during a Slack reload. The native host pushes on omarchy's
-    // theme-set hook, so what the service worker holds is already current.
-    chrome.runtime.sendMessage({ type: "request-fresh-theme" }, (freshTheme) => {
-      if (freshTheme && freshTheme.bg) {
-        const freshRgb = hexToRgb(freshTheme.bg);
-        if (freshRgb) {
-          const freshIsDark = relLuminance(freshRgb) < 0.5;
-          if (freshIsDark !== isDark) {
-            console.log(
-              "[omarchy] stale theme; fresh says",
-              freshIsDark ? "dark" : "light",
-              "(was",
-              isDark ? "dark" : "light",
-              ") — re-applying"
-            );
-            // Re-run applyTheme with the fresh data; that re-triggers automation.
-            lastAppliedThemeKey = null;
-            lastSeenIsDark = null;
-            applyTheme(freshTheme);
-            return;
-          }
-        }
-      }
-      ensureSlackColorMode(isDark).catch((e) =>
-        console.warn("[omarchy] color-mode automation failed:", e)
-      );
-    });
-  }
+  const {
+    fg, accent, dir, sidebarBg, chromeBg, railBg, navBg, sidebarFg, sidebarMuted,
+    fgStrong, hoverBg, selectedBg, borderColor,
+  } = s;
 
   const css = `
     :root, html, body {
@@ -812,8 +702,9 @@ function paintActiveRows() {
   }
   paintedDescendantEls.clear();
 
-  if (!lastAppliedTheme) return;
-  const theme = lastAppliedTheme;
+  const cur = OmarchyTheme.current;
+  if (!cur) return;
+  const theme = cur.theme;
   const bgRgb = hexToRgb(theme.bg);
   if (!bgRgb) return;
   const isDark = relLuminance(bgRgb) < 0.5;
@@ -863,8 +754,9 @@ function paintActiveRows() {
 // scope to the p-activity_ia4_page__ prefix so the Preferences modal's
 // tabs_full_width_class menu is untouched.
 function paintTabStrips() {
-  if (!lastAppliedTheme || !lastAppliedTheme.bg) return;
-  const bg = lastAppliedTheme.bg;
+  const cur = OmarchyTheme.current;
+  if (!cur || !cur.theme.bg) return;
+  const bg = cur.theme.bg;
   const els = document.querySelectorAll(
     '[class*="p-activity_ia4_page__tab_menu"], [class*="p-activity_ia4_page__tab_container"]'
   );
@@ -873,25 +765,18 @@ function paintTabStrips() {
   }
 }
 
-chrome.runtime.onMessage.addListener((msg) => {
-  if (msg && msg.type === "omarchy-theme") applyTheme(msg.theme);
-});
-
-// Force-reapply the last theme, bypassing the de-dup check. Used when
-// something has clobbered our inline CSS variables — e.g. Slack reverting to
-// its default rainbow tokens when the window loses focus, or its React layer
-// stomping our inline style on body/html.
-function forceReapply() {
-  if (!lastAppliedTheme) return;
-  lastAppliedThemeKey = null;
-  applyTheme(lastAppliedTheme);
-}
+// Theme dispatch (live pushes + the initial fetch) is owned by the engine in
+// omarchy-runtime.js; this pack reacts through its registered apply()/
+// onColorMode() hooks. To force a fresh paint after Slack clobbers our inline
+// vars, call OmarchyTheme.reapply() (bypasses the engine's de-dup guard) — e.g.
+// when Slack reverts to its default rainbow tokens on blur, or its React layer
+// stomps our inline style on body/html.
 
 // Re-apply if Slack's SPA navigation tears down our <style> node.
 const observer = new MutationObserver(() => {
   if (!document.getElementById(STYLE_ID)) {
     chrome.runtime.sendMessage({ type: "request-theme" }, (theme) => {
-      if (theme) applyTheme(theme);
+      if (theme) OmarchyTheme.apply(theme);
     });
   }
 });
@@ -902,9 +787,9 @@ observer.observe(document.documentElement, { childList: true, subtree: true });
 // vars, re-apply immediately. Cheap check via the sentinel var.
 const SENTINEL_VAR = "--rainbow-canvas";
 const styleObserver = new MutationObserver(() => {
-  if (!lastAppliedTheme) return;
+  if (!OmarchyTheme.current) return;
   const present = document.documentElement.style.getPropertyValue(SENTINEL_VAR);
-  if (!present || !present.trim()) forceReapply();
+  if (!present || !present.trim()) OmarchyTheme.reapply();
 });
 styleObserver.observe(document.documentElement, { attributes: true, attributeFilter: ["style"] });
 if (document.body) {
@@ -931,9 +816,7 @@ activeRowsObserver.observe(document.body || document.documentElement, {
   childList: true,
 });
 
-chrome.runtime.sendMessage({ type: "request-theme" }, (theme) => {
-  if (theme) applyTheme(theme);
-});
+// (The initial theme fetch is done by the engine in omarchy-runtime.js.)
 
 // ----------------------------------------------------------------------------
 // Programmatic click of Slack's Preferences → Appearance → Light/Dark button.
@@ -1469,10 +1352,20 @@ async function ensureSlackColorMode(targetIsDark) {
       await sleep(150);
     }
 
-    // Hold the lock for a beat after we finish so any in-flight applyTheme
-    // calls don't stack a fresh attempt.
+    // Hold the lock for a beat after we finish so any in-flight theme
+    // applies don't stack a fresh attempt.
     setTimeout(() => {
       automating = false;
     }, 500);
   }
 }
+
+// Register this pack with the generic engine. The engine calls apply() on every
+// theme change and onColorMode() only when the theme crosses light↔dark.
+OmarchyTheme.register({
+  apply: applySlackTheme,
+  onColorMode: (isDark) =>
+    ensureSlackColorMode(isDark).catch((e) =>
+      console.warn("[omarchy] color-mode automation failed:", e)
+    ),
+});
