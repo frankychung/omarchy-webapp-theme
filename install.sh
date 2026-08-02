@@ -231,6 +231,17 @@ if ((DO_UNINSTALL)); then
   exit 0
 fi
 
+# Omarchy 4+ gate. The host reads ~/.local/state/omarchy/current/, which exists
+# only on Omarchy 4+ (pre-4 kept it under ~/.config/omarchy/current). Without it
+# the host would push a generic fallback instead of your theme and never update,
+# so refuse up front rather than silently mis-theme.
+if [[ ! -e "$HOME/.local/state/omarchy/current/theme" ]]; then
+  echo "Error: this needs Omarchy 4+ — didn't find ~/.local/state/omarchy/current." >&2
+  echo "Update Omarchy ('omarchy-update'), then re-run this setup." >&2
+  echo "On older Omarchy, install the pre-0.3 release instead." >&2
+  exit 1
+fi
+
 for f in "$HOST_SCRIPT" "$HOOK_SCRIPT" ${HOST_TEMPLATE:+"$HOST_TEMPLATE"}; do
   [[ -f $f ]] || {
     echo "Error: missing $f" >&2

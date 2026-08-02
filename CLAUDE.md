@@ -43,9 +43,11 @@ script.
   over stdio) + the native-messaging manifest template.
 - `hooks/omarchy-slack-theme` — omarchy `theme-set` hook. Signals SIGUSR1 to
   every running host via pidfiles in `$XDG_RUNTIME_DIR/omarchy-slack-theme/`.
-- `install.sh` — takes no extension ID. Writes host manifests to all nine
-  Chromium-family profile dirs, installs the hook, and adds `--load-extension`
-  to the flags confs of installed browsers. `--no-flags`, `--uninstall`.
+- `install.sh` — takes no extension ID. Refuses on pre-Omarchy-4 (no
+  `~/.local/state/omarchy/current`). Otherwise writes host manifests to all nine
+  Chromium-family profile dirs, symlinks the hook into `hooks/theme-set.d/`, and
+  adds `--load-extension` to the flags confs of installed browsers. `--no-flags`,
+  `--uninstall`.
 
 ## Host design (why it looks like this)
 
