@@ -241,6 +241,14 @@ function linearSxRoles() {
 // the runner-up) so genuinely dual-purpose slots are still left alone.
 function linearDominantRole(counts) {
   if (!counts) return null;
+  // A slot used for surfaces and borders but never for text is safe to treat as a
+  // surface even without a clear margin: mistaking a border for a surface is a
+  // hairline, whereas mistaking text for a surface is unreadable copy. This is
+  // what lets the group-header bands pick up a rung instead of staying grey.
+  if ((counts.surface || 0) > 0 && (counts.text || 0) === 0) {
+    const st = (counts.selected || 0) + (counts.hover || 0);
+    if (st === 0) return "surface";
+  }
   const ranked = ["surface", "text", "border", "hover", "selected"]
     .map((k) => [k, counts[k] || 0])
     .sort((a, b) => b[1] - a[1]);
@@ -400,7 +408,47 @@ function linearPinColorMode(isDark) {
 function linearStructuralCss(s) {
   const bg = s.bg;
   const fg = s.fg;
+  const elev = linearElevation(s);
+  // Opinionated hierarchy. Linear separates regions with hairlines rather than
+  // tone, which reads as one flat colour once everything is recoloured into a
+  // single warm family. These assignments are chosen, not derived: the sidebar
+  // sits back, headers and toolbars form their own band, and the reading surface
+  // stays the page colour. Keyed on structural landmarks (element names and
+  // data-attributes), never on StyleX's generated class names.
+  const banded = elev.bgTertiary;
   return `
+html body header,
+html body [role="toolbar"] {
+  background-color: ${banded} !important;
+  border-color: ${s.borderColor} !important;
+}
+html body nav,
+html body [data-visible-sidebar-item] {
+  background-color: ${elev.sidebar} !important;
+}
+/* Linear exposes real semantic attributes for list structure — data-list-row,
+   data-selected, data-active, data-first-in-group — which are stable in a way its
+   generated StyleX class names are not. Use them for the deliberate hierarchy:
+   rows on the reading surface, the group band raised, and state carried by the
+   accent rather than by another grey. */
+html body [data-list-row] {
+  background-color: ${elev.bgPrimary} !important;
+}
+html body [data-list-row]:hover {
+  background-color: ${s.hoverBg} !important;
+}
+html body [data-list-row][data-selected="true"],
+html body [data-list-row][data-keyboard-active="true"] {
+  background-color: ${s.selectedBg} !important;
+}
+html body [data-first-in-group="true"] {
+  border-top-color: ${s.borderColor} !important;
+}
+html body [data-visible-sidebar-item][data-active="true"],
+html body [data-active="true"][data-contextual-menu] {
+  background-color: ${s.selectedBg} !important;
+}
+`.replace(/\s+/g, " ") + `
 html body,
 html body #root {
   background-color: ${bg} !important;
@@ -725,7 +773,11 @@ OmarchyTheme.register({
       "--color-bg-tertiary": bgTertiary,
       "--color-bg-quaternary": bgQuaternary,
       "--content-bg-color": bgPrimary,
-      "--header-color": bgPrimary,
+      // Deliberately NOT bgPrimary. Linear ships the header at the same colour as
+      // the page and relies on a hairline border for separation, which disappears
+      // once everything is recoloured into one warm family. Give it its own rung
+      // so view headers and group bands read as structure.
+      "--header-color": bgTertiary,
 
       // ----- Text -----
       "--color-text-primary": textPrimary,
