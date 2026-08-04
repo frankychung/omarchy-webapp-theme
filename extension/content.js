@@ -99,10 +99,40 @@ function applySlackTheme(theme, s) {
     }
 
     /* Editing a message: Slack washes the whole row in a hardcoded yellow
-       (rgba(242,199,68,.2)), which fights every omarchy palette. Use a faint
-       accent wash instead — still clearly "this row is being edited". */
+       (rgba(242,199,68,.2)), which fights every omarchy palette. Use a much
+       fainter accent wash — enough to say "this row is being edited" without
+       tinting the editor and its toolbar. A hover-strength wash (20% accent)
+       reads as heavy here because it covers the whole edit box, not one row. */
     html body [class*="c-message_kit__background--editing"],
     html body [class*="message_kit__background--editing"] {
+      background-color: ${withAlpha(accent, 0.07)} !important;
+    }
+
+    /* Inside the editing row, the editor chrome must not stack a second tint on
+       top of that wash (the composer rules paint these with --omarchy-bg, which
+       over the wash reads as a lighter panel). Keep them transparent so the row
+       is one flat surface, and give the formatting toolbar a plain divider
+       instead of its own filled strip. */
+    html body [class*="--editing"] [class*="c-wysiwyg_container"],
+    html body [class*="--editing"] [class*="c-texty_input"],
+    html body [class*="--editing"] [class*="ql-container"],
+    html body [class*="--editing"] [class*="ql-editor"] {
+      background-color: transparent !important;
+    }
+    html body [class*="--editing"] [class*="c-wysiwyg_container__formatting"] {
+      background-color: transparent !important;
+      border-color: var(--omarchy-border) !important;
+    }
+    /* Toolbar buttons: readable icons on the wash, accent only on the active
+       (toggled-on) formatting buttons. */
+    html body [class*="--editing"] [class*="c-wysiwyg_container__formatting"] button,
+    html body [class*="--editing"] [class*="c-texty_buttons"] button {
+      color: ${withAlpha(fg, 0.75)} !important;
+      background-color: transparent !important;
+    }
+    html body [class*="--editing"] [class*="c-wysiwyg_container__formatting"] button:hover,
+    html body [class*="--editing"] [class*="c-texty_buttons"] button:hover {
+      color: var(--omarchy-fg-strong) !important;
       background-color: var(--omarchy-hover-bg) !important;
     }
 
