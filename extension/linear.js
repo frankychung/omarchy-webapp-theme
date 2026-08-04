@@ -29,8 +29,19 @@
 // (2026-08-04: shell + review/ticket views; light-mode fixed same day by
 // usage-based slot classification + the System-preference requirement).
 
-// Resolve any CSS color (hex / rgb / lch / var chain) to {r,g,b} via the
-// browser. Returns null for non-colors (lengths, fonts, shorthands).
+// Resolve any CSS color to {r,g,b}. Returns null for non-colors (lengths, fonts,
+// shorthands).
+//
+// This goes through a 1x1 canvas rather than getComputedStyle, and that detail is
+// the whole ballgame. Linear writes its StyleX slots as lch(), and Chromium now
+// PRESERVES lch() in computed styles instead of normalising to rgb() — so the old
+// getComputedStyle + hexToRgb path returned null for every lch slot, silently
+// skipping the tokens that paint Linear's largest surfaces. That single parse
+// failure is what made the DOM-walking fallbacks look necessary.
+//
+// Canvas fillStyle accepts any CSS color the browser knows (lch, oklch, color(),
+// hsl, named) and the pixel readback is always plain rgba.
+let linearCanvasCtx = null;
 function linearResolveRgb(value) {
   if (!value) return null;
   const v = String(value).trim();
@@ -41,18 +52,40 @@ function linearResolveRgb(value) {
   if (/^(clip|auto|none|solid|hidden|scroll|flex|block|inline)/i.test(v)) return null;
   if (/\b\d+px\b/.test(v) && !/^(#|rgb|hsl|lch|lab|color|oklch)/i.test(v)) return null;
   if (/var\(--font/i.test(v)) return null;
+  // A var() chain can't be resolved by canvas — hand those to the computed-style
+  // path below via a probe element.
+  if (v.includes("var(")) {
+    const probe = document.createElement("div");
+    // The id matters: the sx-watch observer ignores omarchy-* nodes. Without it,
+    // every probe append retriggers the fast repaint → rAF feedback loop.
+    probe.id = "omarchy-linear-probe";
+    probe.style.backgroundColor = "";
+    probe.style.backgroundColor = v;
+    if (!probe.style.backgroundColor) return null;
+    document.documentElement.appendChild(probe);
+    const resolved = getComputedStyle(probe).backgroundColor;
+    probe.remove();
+    return linearResolveRgb(resolved);
+  }
 
-  const probe = document.createElement("div");
-  // The id matters: the sx-watch observer ignores omarchy-* nodes. Without it,
-  // every probe append retriggers the fast repaint → rAF feedback loop.
-  probe.id = "omarchy-linear-probe";
-  probe.style.backgroundColor = "";
-  probe.style.backgroundColor = v;
-  if (!probe.style.backgroundColor) return null;
-  document.documentElement.appendChild(probe);
-  const resolved = getComputedStyle(probe).backgroundColor;
-  probe.remove();
-  return hexToRgb(resolved);
+  if (!linearCanvasCtx) {
+    const c = document.createElement("canvas");
+    c.width = c.height = 1;
+    linearCanvasCtx = c.getContext("2d", { willReadFrequently: true });
+  }
+  if (!linearCanvasCtx) return hexToRgb(v);
+  // Draw over a known pixel so a value the canvas rejects can't masquerade as a
+  // real colour: fillStyle keeps its previous value on an invalid assignment.
+  linearCanvasCtx.fillStyle = "#000000";
+  linearCanvasCtx.fillStyle = v;
+  if (linearCanvasCtx.fillStyle === "#000000" && !/^#0{3,8}$|black|rgba?\(0[,\s]/i.test(v)) {
+    return null;
+  }
+  linearCanvasCtx.clearRect(0, 0, 1, 1);
+  linearCanvasCtx.fillRect(0, 0, 1, 1);
+  const d = linearCanvasCtx.getImageData(0, 0, 1, 1).data;
+  if (d[3] === 0) return null; // fully transparent — not a surface colour
+  return { r: d[0], g: d[1], b: d[2] };
 }
 
 function linearIsNeutralRgb(rgb) {
@@ -93,9 +126,52 @@ function linearElevation(s) {
 // ambiguous — leave them to Linear rather than guess.
 //
 // Hashes change between Linear builds — never hard-code --sx-* names.
+// Visit every style rule in the document, descending into grouping rules.
+//
+// This recursion is essential, not defensive: Linear ships its StyleX atomics
+// inside @layer priority1..N blocks. A CSSLayerBlockRule has no .style, so a
+// flat walk over sheet.cssRules skipped every layer wholesale and only ever saw
+// the :root definition rules — which is why the usage classifier found 0
+// consumers and the sx remap emitted nothing at all.
+function linearEachStyleRule(fn) {
+  const walk = (rules) => {
+    for (const rule of rules || []) {
+      if (rule.cssRules && rule.cssRules.length) walk(rule.cssRules); // @layer/@media/@supports
+      if (rule.style) fn(rule);
+    }
+  };
+  const sheets = [...document.styleSheets, ...(document.adoptedStyleSheets || [])];
+  for (const sheet of sheets) {
+    if (sheet.ownerNode?.id?.startsWith?.("omarchy-")) continue;
+    let rules;
+    try {
+      rules = sheet.cssRules;
+    } catch {
+      continue;
+    }
+    walk(rules);
+  }
+}
+
+// The pristine value of every --sx-* slot, captured on the FIRST scan and never
+// refreshed. Once we start writing overrides, the live computed value of a slot is
+// our own colour — reading that back would re-bucket our output and, because
+// isOurs() then matches, silently stop remapping from the second apply onward.
+const linearPristine = new Map();
+
 function linearSxRoles() {
-  const roles = {}; // name -> { surface?: true, text?: true, border?: true }
+  // name -> { surface: n, text: n, border: n } — COUNTS, not flags. StyleX shares
+  // atomics aggressively, so a slot painting twenty backgrounds is often also read
+  // once as a text or border colour. Treating that as "ambiguous, skip" threw away
+  // the dominant use and was why Linear's biggest surfaces stayed unthemed.
+  const roles = {};
   const aliasEdges = []; // [definingPropName, referencedSlotName]
+  // Which interaction state, if any, a selector is scoped to.
+  const stateOf = (sel) => {
+    if (/:hover|\[data-hover/i.test(sel)) return "hover";
+    if (/selected|\bactive\b|:focus|checked|current|highlight/i.test(sel)) return "selected";
+    return null;
+  };
   const roleOf = (prop) => {
     if (/^background/.test(prop)) return "surface";
     if (
@@ -109,37 +185,45 @@ function linearSxRoles() {
     if (/^(border|outline)/.test(prop)) return "border";
     return null;
   };
-  for (const sheet of document.styleSheets) {
-    let rules;
-    try {
-      rules = sheet.cssRules;
-    } catch {
-      continue;
-    }
-    for (const rule of rules || []) {
-      if (!rule.style) continue;
-      if (rule.parentStyleSheet?.ownerNode?.id?.startsWith?.("omarchy-")) continue;
-      for (let i = 0; i < rule.style.length; i++) {
-        const prop = rule.style[i];
-        const v = rule.style.getPropertyValue(prop);
-        if (!v || !v.includes("--sx-")) continue;
-        const refs = v.match(/--sx-[A-Za-z0-9-]+/g) || [];
-        if (prop.startsWith("--")) {
-          for (const n of refs) aliasEdges.push([prop, n]);
-          continue;
-        }
-        const role = roleOf(prop);
-        if (!role) continue;
-        for (const n of refs) (roles[n] ||= {})[role] = true;
+  linearEachStyleRule((rule) => {
+    // Parse declarations out of cssText rather than walking rule.style.
+    //
+    // Linear writes `background: var(--sx-…)`, a SHORTHAND holding a
+    // pending-substitution value, and Chromium's CSSOM returns "" from
+    // getPropertyValue("background") for those. cssText always carries the
+    // literal declaration.
+    const text = rule.cssText;
+    if (!text || !text.includes("--sx-")) return;
+    const sel = rule.selectorText || "";
+    for (const m of text.matchAll(/([-a-zA-Z0-9]+)\s*:\s*([^;{}]*--sx-[^;{}]*)/g)) {
+      const prop = m[1].toLowerCase();
+      const refs = m[2].match(/--sx-[A-Za-z0-9-]+/g) || [];
+      if (!refs.length) continue;
+      if (prop.startsWith("--")) {
+        for (const n of refs) aliasEdges.push([prop, n]);
+        continue;
+      }
+      let role = roleOf(prop);
+      if (!role) continue;
+      // Surfaces that only ever appear under a STATE selector are highlights, not
+      // elevation. Bucketing them by grey level made every hover row, selected row,
+      // group header and active filter pill a flat neutral grey; routing them to the
+      // accent-tinted hover/selected surfaces is what makes them read as highlights.
+      if (role === "surface" && stateOf(sel)) role = stateOf(sel);
+      for (const n of refs) {
+        const r = (roles[n] ||= { surface: 0, text: 0, border: 0, hover: 0, selected: 0 });
+        r[role]++;
       }
     }
-  }
+  });
   // One propagation pass: --x: var(--sx-y) hands --x's roles to --sx-y.
   for (const [from, to] of aliasEdges) {
     const src = roles[from];
     if (!src) continue;
-    const dst = (roles[to] ||= {});
-    for (const r of Object.keys(src)) dst[r] = true;
+    const dst = (roles[to] ||= { surface: 0, text: 0, border: 0, hover: 0, selected: 0 });
+    for (const k of ["surface", "text", "border", "hover", "selected"]) {
+      dst[k] += src[k] || 0;
+    }
   }
   return roles;
 }
@@ -149,6 +233,20 @@ function linearSxRoles() {
 //    greys, white for light-sheet greys) — the same elevation rank lands on
 //    the same omarchy surface whichever sheet it came from;
 //  - text ranks by contrast strength (distance from mid-grey).
+// Pick the role a slot is actually FOR. Requires a clear winner (at least twice
+// the runner-up) so genuinely dual-purpose slots are still left alone.
+function linearDominantRole(counts) {
+  if (!counts) return null;
+  const ranked = ["surface", "text", "border", "hover", "selected"]
+    .map((k) => [k, counts[k] || 0])
+    .sort((a, b) => b[1] - a[1]);
+  const [top, topN] = ranked[0];
+  const runnerN = ranked[1][1];
+  if (topN === 0) return null;
+  if (runnerN > 0 && topN < runnerN * 2) return null;
+  return top;
+}
+
 function linearSurfaceBucket(level, elev) {
   const rank = level < 0.5 ? level : 1 - level;
   if (rank > 0.32) return null; // not a plausible chrome grey
@@ -197,29 +295,26 @@ function linearSxRemaps(s) {
   // overrides up the ladder.
   const original = {};
   const names = new Set();
-  for (const sheet of document.styleSheets) {
-    let rules;
-    try {
-      rules = sheet.cssRules;
-    } catch {
-      continue;
+  linearEachStyleRule((rule) => {
+    // Read the DEFINITIONS from cssText too: getPropertyValue returns "" for
+    // these declarations as well, which left `original` empty — the value lookup
+    // then fell back to the computed root value, which after the first apply is
+    // OUR OWN colour, and isOurs() skipped the slot. That made the remap stop
+    // working from the second apply onward.
+    const text = rule.cssText;
+    if (!text || !text.includes("--sx-")) return;
+    const sel = rule.selectorText || "";
+    const modeHit = s.isDark
+      ? /\.dark\b|dark-theme|color-scheme:\s*dark/i.test(sel)
+      : /\.light\b|light-theme|color-scheme:\s*light/i.test(sel);
+    for (const m of text.matchAll(/(--sx-[A-Za-z0-9-]+)\s*:\s*([^;{}]+)/g)) {
+      const p = m[1];
+      const v = m[2].trim();
+      names.add(p);
+      if (v && (modeHit || !original[p])) original[p] = v;
+      if (v && !linearPristine.has(p)) linearPristine.set(p, v);
     }
-    for (const rule of rules || []) {
-      if (!rule.style) continue;
-      if (rule.parentStyleSheet?.ownerNode?.id?.startsWith?.("omarchy-")) continue;
-      for (let i = 0; i < rule.style.length; i++) {
-        const p = rule.style[i];
-        if (!p.startsWith("--sx-")) continue;
-        names.add(p);
-        const v = rule.style.getPropertyValue(p).trim();
-        const sel = rule.selectorText || "";
-        const modeHit = s.isDark
-          ? /\.dark\b|dark-theme|color-scheme:\s*dark/i.test(sel)
-          : /\.light\b|light-theme|color-scheme:\s*light/i.test(sel);
-        if (v && (modeHit || !original[p])) original[p] = v;
-      }
-    }
-  }
+  });
   const cs = getComputedStyle(document.documentElement);
   for (let i = 0; i < cs.length; i++) {
     if (cs[i].startsWith("--sx-")) names.add(cs[i]);
@@ -229,18 +324,22 @@ function linearSxRemaps(s) {
   const borderNormal = s.borderColor;
   const borderStrong = withAlpha(s.fg, s.isDark ? 0.16 : 0.14);
   for (const prop of names) {
-    const value = original[prop] || cs.getPropertyValue(prop).trim();
+    const value =
+      linearPristine.get(prop) || original[prop] || cs.getPropertyValue(prop).trim();
+    if (!linearPristine.has(prop) && value) linearPristine.set(prop, value);
     if (!value) continue;
     const rgb = linearResolveRgb(value);
     if (!rgb || !linearIsNeutralRgb(rgb)) continue;
     if (isOurs(rgb)) continue;
-    const role = roles[prop] || {};
-    if (role.surface && role.text) continue; // ambiguous — leave it to Linear
+    const role = linearDominantRole(roles[prop]);
+    if (!role) continue; // no consumer, or genuinely dual-purpose
     const level = linearGreyLevel(rgb);
     let bucket = null;
-    if (role.surface) bucket = linearSurfaceBucket(level, elev);
-    else if (role.text) bucket = linearTextBucket(level, text);
-    else if (role.border)
+    if (role === "hover") bucket = s.hoverBg;
+    else if (role === "selected") bucket = s.selectedBg;
+    else if (role === "surface") bucket = linearSurfaceBucket(level, elev);
+    else if (role === "text") bucket = linearTextBucket(level, text);
+    else if (role === "border")
       bucket = Math.abs(level - 0.5) * 2 > 0.5 ? borderStrong : borderNormal;
     // No known consumer → skip. Guessing unconsumed slots by grey level is
     // exactly what broke light mode.
