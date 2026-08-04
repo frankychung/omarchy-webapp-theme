@@ -100,6 +100,12 @@ from `omarchy-slack-theme`? The setup cleans up the old name's wiring too.)
 Then fully quit your browser and open `app.slack.com`, `web.whatsapp.com`, or
 `github.com`.
 
+On GitHub, only the app is themed. The marketing site (`/features/*`, `/pricing`,
+`/resources/*`, `/open-source`, and the signed-out homepage) is left as GitHub
+ships it — those pages deliberately alternate dark and light hero sections, so
+repainting them onto a single terminal background flattens the design instead of
+theming it.
+
 ### From a git checkout
 
 ```sh
