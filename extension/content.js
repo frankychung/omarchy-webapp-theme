@@ -387,6 +387,56 @@ function applySlackTheme(theme, s) {
       background-color: transparent !important;
     }
 
+    /* ===== quick-switcher / search modal =====
+       Slack hardcodes this whole surface: the pseudo-selected row at
+       rgb(234,234,234), the keyboard-key chips at rgb(221,221,221), the footer
+       at pure white, and the feedback link in Slack blue. None of it follows the
+       theme, so on a light palette the modal reads as a grey card. ===== */
+    html body [class*="c-search_autocomplete__footer"],
+    html body [class*="c-search_modal__footer"] {
+      background-color: var(--omarchy-sidebar-bg) !important;
+      border-color: var(--omarchy-border) !important;
+      color: var(--omarchy-fg) !important;
+    }
+    html body [class*="c-search_autocomplete__suggestion_item--pseudo-selected"],
+    html body [class*="c-search_autocomplete__suggestion_item"][aria-selected="true"],
+    html body [class*="c-search_autocomplete__suggestion_item"]:hover {
+      background-color: var(--omarchy-hover-bg) !important;
+    }
+    html body [class*="c-keyboard_key"] {
+      background-color: ${withAlpha(fg, 0.1)} !important;
+      border-color: var(--omarchy-border) !important;
+      color: var(--omarchy-fg) !important;
+    }
+    /* Slack-blue links → the theme accent. Scoped to the surfaces we repaint
+       (the search modal and the workspace banners), so message-body links keep
+       Slack's own link colour and stay distinguishable as user content. */
+    html body [class*="c-search_modal"] [class*="c-link--button"],
+    html body [class*="c-search_modal"] a,
+    html body [class*="c-banner"] [class*="c-link"],
+    html body [class*="c-banner"] a,
+    html body [class*="p-ia__workspace_banner"] a,
+    html body [class*="p-client__banners"] a {
+      color: var(--omarchy-accent) !important;
+    }
+
+    /* The composer's context bar — "X has paused their notifications", editing
+       context, and similar notices that sit above the input. Slack fills it with
+       a hardcoded rgb(243,243,243), so on any themed composer it reads as an
+       unthemed white strip. Use a faint wash of the theme foreground: still a
+       distinct notice band, but in-palette. */
+    html body [class*="p-context_bar"] {
+      background-color: ${withAlpha(fg, 0.06)} !important;
+      color: var(--omarchy-fg) !important;
+      border-color: var(--omarchy-border) !important;
+    }
+    html body [class*="p-context_bar"] [class*="content"],
+    html body [class*="p-context_bar"] span,
+    html body [class*="p-context_bar"] strong {
+      background-color: transparent !important;
+      color: var(--omarchy-fg) !important;
+    }
+
     /* Sidebar "Find a conversation…" filter input. Slack fills this with a
        hardcoded rgba(255,255,255,.9) plus a near-black hairline, so on a tinted
        sidebar it reads as a pale card floating over the list rather than an
