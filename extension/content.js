@@ -376,6 +376,24 @@ function applySlackTheme(theme, s) {
       background-color: var(--omarchy-hover-bg) !important;
     }
 
+    /* Slack nests its own hover layer (c-message_kit__hover--hovered) inside the
+       hovered row, so both selectors above match at once and the wash stacks
+       (0.2 over 0.2 ≈ 0.36 — it reads muddy, not tinted). The outer row carries
+       the wash; the inner layer must stay clear. */
+    html body [class*="c-message_kit__background--hovered"] [class*="c-message_kit__hover"] {
+      background-color: transparent !important;
+    }
+
+    /* The compact timestamp gutter is named p-message_pane_message__compact_timestamp,
+       so the broad [class*="p-message_pane"] rule in the main-pane block above
+       painted it an OPAQUE --omarchy-bg. On a hovered row that punched a
+       bg-colored hole through the wash right where the time sits (the "cut out
+       date"). It needs no fill of its own — the row behind it is already ours. */
+    html body [class*="p-message_pane_message__compact_timestamp"],
+    html body [class*="c-timestamp"] {
+      background-color: transparent !important;
+    }
+
     /* The floating message action toolbar (👍 ❤️ ✅ … New) and the emoji
        reaction picker popover. Slack's default background for these is a
        translucent token that goes see-through against our repainted message
