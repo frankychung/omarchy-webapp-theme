@@ -553,6 +553,7 @@ function linearArmSxWatch() {
 }
 
 OmarchyTheme.register({
+  id: "linear",
   cssVars(theme, s) {
     const elev = linearElevation(s);
     const { bgPrimary, bgSecondary, bgTertiary, bgQuaternary, sidebar, sidebarDeep } = elev;

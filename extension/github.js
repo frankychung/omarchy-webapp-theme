@@ -16,6 +16,7 @@
 // in GitHub settings can disagree with our paints when omarchy flips.
 
 OmarchyTheme.register({
+  id: "github",
   cssVars(theme, s) {
     // Inset is darker than the page on dark themes and slightly washed on light
     // (GitHub: #010409 vs #0d1117 dark; #f6f8fa vs #fff light).

@@ -79,18 +79,22 @@ script.
 The whole point of the engine/pack split. One extension, one pinned ID, one
 host manifest — a new site needs **no new keys and no native-messaging changes**:
 
-1. Create `extension/<site>.js` ending in `OmarchyTheme.register({...})`.
-   Start declarative: `cssVars(theme, s)` returning a map of the SITE'S OWN css
-   custom properties → derived surfaces (see `whatsapp.js`). Only escalate to
-   `apply()` + observers + `onColorMode()` if the site fights back (see
-   `content.js` — Slack is the worst case).
+1. Create `extension/<site>.js` ending in `OmarchyTheme.register({ id: "<site>",
+   ... })`. Start declarative: `cssVars(theme, s)` returning a map of the SITE'S
+   OWN css custom properties → derived surfaces (see `whatsapp.js`). Only
+   escalate to `apply()` + observers + `onColorMode()` if the site fights back
+   (see `content.js` — Slack is the worst case).
 2. In `manifest.json`: add the site's URL pattern to `host_permissions`, to the
    two shared entries (shim + engine), and add a new content-script entry
    loading just `<site>.js` for that pattern. Keep pack files flat in
    `extension/` — the AUR PKGBUILD installs with a flat `extension/*` glob.
-3. `background.js` and `install.sh` need nothing; the site list is derived from
+3. Add the site's row to `SITES` in `extension/options.js` (the per-site
+   enable/disable toggle; the `id` must match the register call — the engine
+   gates on `chrome.storage.sync` `disabledSites[id]` and pends the theme until
+   both the pack and the settings have arrived).
+4. `background.js` and `install.sh` need nothing; the site list is derived from
    the manifest.
-4. Verify against the live site (see Dev / test workflow). Read variable/class
+5. Verify against the live site (see Dev / test workflow). Read variable/class
    names off the live DOM — never guess.
 
 The host's payload carries the stable named fields (`bg`, `fg`, `accent`,

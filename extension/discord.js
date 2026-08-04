@@ -20,6 +20,7 @@
 // "System default".
 
 OmarchyTheme.register({
+  id: "discord",
   cssVars(theme, s) {
     const surfaceHigh = shade(s.bg, s.dir * 0.07);
     const surfaceHigher = shade(s.bg, s.dir * 0.09);

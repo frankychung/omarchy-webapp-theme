@@ -1363,6 +1363,7 @@ async function ensureSlackColorMode(targetIsDark) {
 // Register this pack with the generic engine. The engine calls apply() on every
 // theme change and onColorMode() only when the theme crosses light↔dark.
 OmarchyTheme.register({
+  id: "slack",
   apply: applySlackTheme,
   onColorMode: (isDark) =>
     ensureSlackColorMode(isDark).catch((e) =>

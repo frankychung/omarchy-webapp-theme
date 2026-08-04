@@ -20,6 +20,7 @@
 // "System default" is the supported configuration.
 
 OmarchyTheme.register({
+  id: "whatsapp",
   cssVars(theme, s) {
     // Bare "r, g, b" triplet for WhatsApp's -RGB twins. hexToRgb also accepts
     // the rgb()/rgba() strings that shade()/mix() emit.

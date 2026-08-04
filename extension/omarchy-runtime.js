@@ -21,6 +21,8 @@ const OmarchyTheme = {
   _pack: null,
   _lastKey: null, // JSON of the last applied theme; de-dups repeat pushes
   _lastIsDark: null, // last light/dark state; onColorMode fires only on a crossing
+  _settings: null, // disabledSites map from the options page; null until loaded
+  _pendingTheme: null, // theme held until pack + settings both exist
   current: null, // { theme, surfaces } — app packs read this for re-paints
 
   register(pack) {
@@ -33,7 +35,17 @@ const OmarchyTheme = {
     if (this.current) {
       this._lastKey = null;
       this.apply(this.current.theme);
+    } else {
+      this._flushPending();
     }
+  },
+
+  _flushPending() {
+    if (!this._pendingTheme) return;
+    const theme = this._pendingTheme;
+    this._pendingTheme = null;
+    this._lastKey = null;
+    this.apply(theme);
   },
 
   // Re-run the current theme, bypassing the de-dup guard. App packs call this
@@ -46,6 +58,19 @@ const OmarchyTheme = {
 
   apply(theme) {
     if (!theme || !theme.bg) return;
+    // Hold the theme until both the pack and the settings have arrived — the
+    // pack loads in a separate content-script entry and the settings read is
+    // async, so any arrival order is possible.
+    if (!this._pack || this._settings === null) {
+      this._pendingTheme = theme;
+      return;
+    }
+    if (this._pack.id && this._settings[this._pack.id]) {
+      // Site toggled off: keep the theme so a live re-enable can paint it,
+      // and produce no side effects — no colorScheme, no shim event, no pack.
+      this._pendingTheme = theme;
+      return;
+    }
     const surfaces = deriveSurfaces(theme);
     if (!surfaces) return;
 
@@ -125,10 +150,39 @@ const OmarchyTheme = {
   },
 };
 
+// Per-site enable/disable from the options page. The read is async — apply()
+// pends until it lands. On a live disable we stop repainting and drop the var
+// sheet immediately; inline styles a full-tier pack already painted stay until
+// the next tab load. A live re-enable repaints from the pended theme.
+try {
+  chrome.storage.sync.get({ disabledSites: {} }, (data) => {
+    OmarchyTheme._settings = (data && data.disabledSites) || {};
+    OmarchyTheme._flushPending();
+  });
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area !== "sync" || !changes.disabledSites) return;
+    OmarchyTheme._settings = changes.disabledSites.newValue || {};
+    const pack = OmarchyTheme._pack;
+    if (pack && pack.id && OmarchyTheme._settings[pack.id]) {
+      const vars = document.getElementById("omarchy-webapp-vars");
+      if (vars) vars.remove();
+      document.documentElement.style.removeProperty("color-scheme");
+      if (OmarchyTheme.current) OmarchyTheme._pendingTheme = OmarchyTheme.current.theme;
+      OmarchyTheme.current = null;
+      OmarchyTheme._lastKey = null;
+      OmarchyTheme._lastIsDark = null;
+    } else {
+      OmarchyTheme._flushPending();
+    }
+  });
+} catch (_) {
+  // No storage access (shouldn't happen) — fail open so theming still works.
+  OmarchyTheme._settings = {};
+}
+
 // Themes arrive two ways: pushed live by background.js on an omarchy theme-set,
-// and fetched once on load. Both funnel through OmarchyTheme.apply(). The async
-// callback fires after the whole content-script list has run, so the app pack
-// has always registered by the time either path dispatches.
+// and fetched once on load. Both funnel through OmarchyTheme.apply(), which
+// pends them until the pack and settings are in.
 chrome.runtime.onMessage.addListener((msg) => {
   if (msg && msg.type === "omarchy-theme") OmarchyTheme.apply(msg.theme);
 });
