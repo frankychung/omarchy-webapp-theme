@@ -110,6 +110,11 @@ OmarchyTheme.register({
       "--neutralPrimarySurface": s.bg,
       "--neutralSecondarySurface": s.sidebarBg,
       "--neutralTertiarySurface": s.chromeBg,
+      // The calendar grid's past / out-of-range time slots. Outlook offsets them
+      // slightly from the live area rather than matching it (white vs #fafafa),
+      // so keep a gentle offset instead of collapsing them onto the background —
+      // otherwise past and upcoming hours become indistinguishable.
+      "--neutralLighterAlt": shade(s.bg, s.dir * 0.03),
       "--headerBackground": s.chromeBg,
       "--headerBackgroundSearch": s.chromeBg,
       "--headerButtonsBackground": s.chromeBg,
@@ -151,9 +156,15 @@ OmarchyTheme.register({
       '[data-app-section="Ribbon"]',
       '[data-app-section="MailReadCompose"]',
       '[data-app-section="ConversationContainer"]',
+      // Calendar carries its own set of section names.
+      '[data-app-section="CalendarModule"]',
+      '[data-app-section="CalendarModuleSurface"]',
+      '[data-app-section="CalendarSurfaceNavigationToolbar"]',
+      '[data-app-section^="Surface_"]',
+      '[data-app-section^="calendar-view"]',
     ].join(", ");
     style.textContent = [
-      regions + " { --white: " + s.bg + "; --neutralLighterAlt: " + s.bg + "; }",
+      regions + " { --white: " + s.bg + "; }",
       '[role="option"] { background-color: ' + s.bg + " !important; }",
       '[role="option"]:hover { background-color: ' + s.hoverBg + " !important; }",
       '[role="option"][aria-selected="true"] { background-color: ' + s.selectedBg + " !important; }",
