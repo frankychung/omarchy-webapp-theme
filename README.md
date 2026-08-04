@@ -1,7 +1,7 @@
 # omarchy-webapp-theme
 
-A tiny browser extension that makes web apps — **Slack, WhatsApp Web, and
-GitHub** — follow your [Omarchy](https://omarchy.org/) theme: painting their
+A tiny browser extension that makes web apps — **Slack, WhatsApp Web, GitHub,
+and Linear** — follow your [Omarchy](https://omarchy.org/) theme: painting their
 surfaces with your terminal's palette and flipping their Light/Dark mode
 whenever you switch omarchy themes, so they visually blend into the rest of
 your desktop.
@@ -26,9 +26,9 @@ and Edge.
   the new state to the extension the moment the theme lands.
 - **Not just Slack**: the extension is a theme engine plus one small "pack" per
   site. WhatsApp Web (surfaces, bubbles, unread badges, and even default
-  avatars recolored from your terminal palette) and GitHub (Primer design
-  tokens) ship too — and adding another site is one pack file + one manifest
-  entry.
+  avatars recolored from your terminal palette), GitHub (Primer design
+  tokens), and Linear (sidebar + elevation ladder) ship too — adding another
+  site is one pack file + one manifest entry.
 
 https://github.com/user-attachments/assets/83787af6-7c41-4449-9460-c7f67b21aa5b
 
@@ -200,6 +200,7 @@ extension/
 ├── content.js                      # the Slack pack: injects CSS + drives prefs automation
 ├── whatsapp.js                     # the WhatsApp pack: declarative CSS-var table
 ├── github.js                       # the GitHub pack: Primer CSS-var table
+├── linear.js                       # the Linear pack: semantic CSS-var table
 └── inject-prefers-color-scheme.js  # MAIN-world: matchMedia polyfill + React-click bridge
 
 native-host/

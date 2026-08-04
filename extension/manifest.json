@@ -10,7 +10,10 @@
     "*://*.slack.com/*",
     "*://web.whatsapp.com/*",
     "*://github.com/*",
-    "*://gist.github.com/*"
+    "*://gist.github.com/*",
+    "*://linear.app/*",
+    "*://*.linear.app/*",
+    "*://discord.com/*"
   ],
   "background": {
     "service_worker": "background.js"
@@ -22,7 +25,10 @@
         "*://*.slack.com/*",
         "*://web.whatsapp.com/*",
         "*://github.com/*",
-        "*://gist.github.com/*"
+        "*://gist.github.com/*",
+        "*://linear.app/*",
+        "*://*.linear.app/*",
+        "*://discord.com/*"
       ],
       "js": ["inject-prefers-color-scheme.js"],
       "run_at": "document_start",
@@ -35,7 +41,10 @@
         "*://*.slack.com/*",
         "*://web.whatsapp.com/*",
         "*://github.com/*",
-        "*://gist.github.com/*"
+        "*://gist.github.com/*",
+        "*://linear.app/*",
+        "*://*.linear.app/*",
+        "*://discord.com/*"
       ],
       "js": [
         "omarchy-colors.js",
@@ -60,6 +69,18 @@
     {
       "matches": ["*://github.com/*", "*://gist.github.com/*"],
       "js": ["github.js"],
+      "run_at": "document_start",
+      "all_frames": false
+    },
+    {
+      "matches": ["*://linear.app/*", "*://*.linear.app/*"],
+      "js": ["linear.js"],
+      "run_at": "document_start",
+      "all_frames": false
+    },
+    {
+      "matches": ["*://discord.com/*"],
+      "js": ["discord.js"],
       "run_at": "document_start",
       "all_frames": false
     }

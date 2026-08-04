@@ -8,11 +8,11 @@ A small **Manifest V3 browser extension** (Brave/Chrome/Chromium) that makes
 web apps follow the current [Omarchy](https://omarchy.org/) theme. One
 app-agnostic **engine** + one **pack per site**: Slack (`content.js`, the full
 pack — repaints chrome/sidebar/message pane and auto-flips Slack's Light/Dark
-Color Mode), WhatsApp Web (`whatsapp.js`, declarative), and GitHub
-(`github.js`, declarative Primer tokens). A **bash native-messaging host**
-reads the active Omarchy theme from `~/.local/state/omarchy/current/` and
-pushes theme changes to the extension the moment they land. **Requires
-Omarchy 4+.**
+Color Mode), WhatsApp Web (`whatsapp.js`, declarative), GitHub (`github.js`,
+declarative Primer tokens), and Linear (`linear.js`, declarative). A **bash
+native-messaging host** reads the active Omarchy theme from
+`~/.local/state/omarchy/current/` and pushes theme changes to the extension
+the moment they land. **Requires Omarchy 4+.**
 
 This is end-user desktop tooling, not a web service. There is no build step, no
 package manager, and no test suite — it's plain JS plus a dependency-free bash
@@ -42,6 +42,15 @@ script.
     against public github.com (2026-08-04). `onColorMode` pins
     `data-color-mode`; Appearance → "Sync with system" is the supported setup.
     Matches `github.com` and `gist.github.com`.
+  - `linear.js` — **the Linear pack**: semantic tokens (`--bg-*`, `--color-*`,
+    `--focus-*`) plus a dynamic remap of Linear's hashed StyleX `--sx-*` slots,
+    each classified by USAGE (which CSS property consumes it — background →
+    surface, color/fill → text; grey-level guessing is under-determined and
+    broke light mode) and re-stomped via a fast rAF paint path on re-renders.
+    **Requires Linear's interface theme set to "System preference"** (Ctrl+K →
+    "Change interface theme"; per-device, client-DB-backed — with a pinned
+    Light/Dark theme Linear renders hardcoded lch() styles no override can
+    reach). Matches `linear.app` and `*.linear.app`.
   - `background.js` — MV3 service worker. Holds the native-messaging port,
     rebroadcasts pushed themes to matched tabs (the site list is derived from
     the manifest's content-script matches — adding a pack never touches this
