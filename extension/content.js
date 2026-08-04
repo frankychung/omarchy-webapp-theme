@@ -90,7 +90,45 @@ function applySlackTheme(theme, s) {
     html body [class*="p-threads_view"],
     html body [class*="channel_info_pane"],
     html body .c-virtual_list__scroll_container,
-    html body [class*="c-message_kit__background"] {
+    html body [class*="c-message_kit__background"],
+    /* Undecorated full-pane div directly under the workspace wrapper: Slack
+       leaves it on a hardcoded navy on every view (found by auditing painted
+       area — see Dev / test workflow). */
+    html body [class*="p-client_workspace_wrapper"] > div {
+      background-color: var(--omarchy-bg) !important;
+    }
+
+    /* Editing a message: Slack washes the whole row in a hardcoded yellow
+       (rgba(242,199,68,.2)), which fights every omarchy palette. Use a faint
+       accent wash instead — still clearly "this row is being edited". */
+    html body [class*="c-message_kit__background--editing"],
+    html body [class*="message_kit__background--editing"] {
+      background-color: var(--omarchy-hover-bg) !important;
+    }
+
+    /* ===== dropdown menus / overlays =====
+       Menus (the More…, Admin, and every context menu) paint their own dark
+       surface and never picked up our vars. They're the largest remaining
+       unthemed area after the panes. ===== */
+    html body [class*="c-menu__items"],
+    html body [class*="c-menu--alternate"],
+    html body [class*="p-more_menu"],
+    html body [class*="c-menu_group"],
+    html body [class*="p-team_switcher_menu"] {
+      background-color: var(--omarchy-nav-bg) !important;
+      border-color: var(--omarchy-border) !important;
+    }
+
+    /* Slack's brand-green primary buttons → the omarchy accent. */
+    html body [class*="c-button--primary"] {
+      background-color: var(--omarchy-accent) !important;
+      border-color: var(--omarchy-accent) !important;
+    }
+
+    /* The "Today" tab's own pane wrapper (hashed class — match the stable
+       prefix). It was the single largest unthemed surface left in the client. */
+    html body [class*="todayWrapper"],
+    html body [class*="p-autoclog__hook"] {
       background-color: var(--omarchy-bg) !important;
     }
 
