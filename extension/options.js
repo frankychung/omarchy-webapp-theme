@@ -10,6 +10,7 @@ const SITES = [
   { id: "github", label: "GitHub", host: "github.com" },
   { id: "linear", label: "Linear", host: "linear.app" },
   { id: "discord", label: "Discord", host: "discord.com" },
+  { id: "outlook", label: "Outlook", host: "outlook.office.com" },
 ];
 
 const container = document.getElementById("sites");

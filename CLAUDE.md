@@ -51,6 +51,14 @@ script.
     "Change interface theme"; per-device, client-DB-backed — with a pinned
     Light/Dark theme Linear renders hardcoded lch() styles no override can
     reach). Matches `linear.app` and `*.linear.app`.
+  - `outlook.js` — **the Outlook pack** (declarative tier): maps Fluent v9
+    semantic tokens (`--colorNeutralBackground1..6` + Hover/Pressed/Selected,
+    `--colorNeutralForeground1..4`, `--colorNeutralStroke*`, `--colorBrand*`)
+    plus the legacy chrome set (`--neutralSecondarySurface`,
+    `--headerBackground`, …) to derived surfaces. Verified against the live
+    mailbox (2026-08-04). **Never remap `--white`/`--black`** — they're literal
+    colors for icon fills and text on brand buttons; repointing them inverts
+    contrast. Outlook follows the system light/dark on its own.
   - `background.js` — MV3 service worker. Holds the native-messaging port,
     rebroadcasts pushed themes to matched tabs (the site list is derived from
     the manifest's content-script matches — adding a pack never touches this

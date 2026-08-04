@@ -15,7 +15,10 @@
     "*://gist.github.com/*",
     "*://linear.app/*",
     "*://*.linear.app/*",
-    "*://discord.com/*"
+    "*://discord.com/*",
+    "*://outlook.office.com/*",
+    "*://outlook.office365.com/*",
+    "*://outlook.live.com/*"
   ],
   "background": {
     "service_worker": "background.js"
@@ -29,7 +32,10 @@
         "*://gist.github.com/*",
         "*://linear.app/*",
         "*://*.linear.app/*",
-        "*://discord.com/*"
+        "*://discord.com/*",
+        "*://outlook.office.com/*",
+        "*://outlook.office365.com/*",
+        "*://outlook.live.com/*"
       ],
       "js": [
         "inject-prefers-color-scheme.js"
@@ -46,7 +52,10 @@
         "*://gist.github.com/*",
         "*://linear.app/*",
         "*://*.linear.app/*",
-        "*://discord.com/*"
+        "*://discord.com/*",
+        "*://outlook.office.com/*",
+        "*://outlook.office365.com/*",
+        "*://outlook.live.com/*"
       ],
       "js": [
         "omarchy-colors.js",
@@ -104,6 +113,18 @@
       ],
       "js": [
         "discord.js"
+      ],
+      "run_at": "document_start",
+      "all_frames": false
+    },
+    {
+      "matches": [
+        "*://outlook.office.com/*",
+        "*://outlook.office365.com/*",
+        "*://outlook.live.com/*"
+      ],
+      "js": [
+        "outlook.js"
       ],
       "run_at": "document_start",
       "all_frames": false
