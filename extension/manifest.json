@@ -18,7 +18,8 @@
     "*://discord.com/*",
     "*://outlook.office.com/*",
     "*://outlook.office365.com/*",
-    "*://outlook.live.com/*"
+    "*://outlook.live.com/*",
+    "*://outlook.cloud.microsoft/*"
   ],
   "background": {
     "service_worker": "background.js"
@@ -35,7 +36,8 @@
         "*://discord.com/*",
         "*://outlook.office.com/*",
         "*://outlook.office365.com/*",
-        "*://outlook.live.com/*"
+        "*://outlook.live.com/*",
+        "*://outlook.cloud.microsoft/*"
       ],
       "js": [
         "inject-prefers-color-scheme.js"
@@ -55,7 +57,8 @@
         "*://discord.com/*",
         "*://outlook.office.com/*",
         "*://outlook.office365.com/*",
-        "*://outlook.live.com/*"
+        "*://outlook.live.com/*",
+        "*://outlook.cloud.microsoft/*"
       ],
       "js": [
         "omarchy-colors.js",
@@ -121,7 +124,8 @@
       "matches": [
         "*://outlook.office.com/*",
         "*://outlook.office365.com/*",
-        "*://outlook.live.com/*"
+        "*://outlook.live.com/*",
+        "*://outlook.cloud.microsoft/*"
       ],
       "js": [
         "outlook.js"

@@ -87,7 +87,27 @@ OmarchyTheme.register({
       "--colorBrandForeground1": s.accent,
       "--colorBrandForeground2": shade(s.accent, -s.dir * 0.08),
 
+      // ----- Legacy Office theme palette -----
+      // A third generation, and the busiest: --themePrimary alone has 376 uses
+      // and paints the blue subject lines. The Lighter/LighterAlt end supplies
+      // the message-list selection washes, so mapping these themes selection
+      // through the token layer rather than by selector.
+      "--themePrimary": s.accent,
+      "--themeSecondary": shade(s.accent, s.dir * 0.06),
+      "--themeTertiary": shade(s.accent, s.dir * 0.12),
+      "--themeDarkAlt": shade(s.accent, -s.dir * 0.06),
+      "--themeDark": shade(s.accent, -s.dir * 0.12),
+      "--themeDarker": shade(s.accent, -s.dir * 0.18),
+      "--themeLight": withAlpha(s.accent, 0.28),
+      "--themeLighter": s.selectedBg,
+      "--themeLighterAlt": s.hoverBg,
+
       // ----- Legacy chrome tokens -----
+      // --neutralPrimarySurface is what actually paints the list header
+      // ("Focused / Other", the sort controls) and the "Other Emails" summary
+      // row — all of which have generated class names, so CDS matched-styles
+      // was the only way to find the token behind them.
+      "--neutralPrimarySurface": s.bg,
       "--neutralSecondarySurface": s.sidebarBg,
       "--neutralTertiarySurface": s.chromeBg,
       "--headerBackground": s.chromeBg,
@@ -97,5 +117,49 @@ OmarchyTheme.register({
       "--neutralLight": s.chromeBg,
       "--neutralLighter": s.sidebarBg,
     };
+  },
+
+  // The message-list rows are the one surface the token layer can't reach: they
+  // paint from --white, which is a LITERAL colour here — it stays #FFFFFF in dark
+  // mode as well as light, and is used for icon fills and for text on
+  // brand-coloured buttons, so remapping it inverts contrast where it matters.
+  //
+  // Their class names are generated (jGG6V.gDC9O.UWKUc), so the stable hook is
+  // the ARIA role Outlook gives every list row. Hover and selection are already
+  // handled through --themeLighter/--themeLighterAlt above; these rules only
+  // supply the resting surface and act as a backstop for the other two.
+  apply(theme, s) {
+    let style = document.getElementById("omarchy-outlook-rows");
+    if (!style) {
+      style = document.createElement("style");
+      style.id = "omarchy-outlook-rows";
+      (document.head || document.documentElement).appendChild(style);
+    }
+    // The list header ("Focused / Other", the sort controls) and the "Other
+    // Emails" summary row are white too, but every one of them has generated
+    // class names (bkYAr, NISFx.dFpOt, …) that change between builds, so they
+    // can't be targeted directly.
+    //
+    // Instead, REDEFINE --white locally on Outlook's stable data-app-section
+    // containers. Custom properties inherit, so everything inside those regions
+    // that resolves var(--white) picks up the theme surface, while --white stays
+    // literally white everywhere else — which is what the app-launcher icons and
+    // the text on brand-coloured buttons need. No class names involved.
+    const regions = [
+      '[data-app-section="MessageList"]',
+      '[data-app-section="NavigationPane"]',
+      '[data-app-section="Ribbon"]',
+      '[data-app-section="MailReadCompose"]',
+      '[data-app-section="ConversationContainer"]',
+    ].join(", ");
+    style.textContent = [
+      regions + " { --white: " + s.bg + "; --neutralLighterAlt: " + s.bg + "; }",
+      '[role="option"] { background-color: ' + s.bg + " !important; }",
+      '[role="option"]:hover { background-color: ' + s.hoverBg + " !important; }",
+      '[role="option"][aria-selected="true"] { background-color: ' + s.selectedBg + " !important; }",
+      // The list's own scroll container and the date group headers sit behind
+      // the rows and pick up the same literal white.
+      '[role="listbox"], [role="grid"] { background-color: ' + s.bg + " !important; }",
+    ].join("\n");
   },
 });
