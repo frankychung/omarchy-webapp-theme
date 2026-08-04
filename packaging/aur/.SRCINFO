@@ -1,5 +1,5 @@
 pkgbase = omarchy-webapp-theme
-	pkgdesc = Make web apps (Slack, WhatsApp, GitHub) follow your current Omarchy theme
+	pkgdesc = Make Slack, Discord, GitHub, Linear, Outlook and WhatsApp follow your Omarchy theme
 	pkgver = 0.3.0
 	pkgrel = 1
 	url = https://github.com/scottjones/omarchy-webapp-theme

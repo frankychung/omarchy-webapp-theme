@@ -1,10 +1,10 @@
 # omarchy-webapp-theme
 
 A tiny browser extension that makes web apps — **Slack, WhatsApp Web, GitHub,
-and Linear** — follow your [Omarchy](https://omarchy.org/) theme: painting their
-surfaces with your terminal's palette and flipping their Light/Dark mode
-whenever you switch omarchy themes, so they visually blend into the rest of
-your desktop.
+Linear, Discord, and Outlook** — follow your [Omarchy](https://omarchy.org/)
+theme: painting their surfaces with your terminal's palette and flipping their
+Light/Dark mode whenever you switch omarchy themes, so they visually blend into
+the rest of your desktop.
 
 Built and tested on Brave on Arch Linux + Omarchy. Works on Chrome, Chromium,
 and Edge.
@@ -26,9 +26,9 @@ and Edge.
   the new state to the extension the moment the theme lands.
 - **Not just Slack**: the extension is a theme engine plus one small "pack" per
   site. WhatsApp Web (surfaces, bubbles, unread badges, and even default
-  avatars recolored from your terminal palette), GitHub (Primer design
-  tokens), and Linear (sidebar + elevation ladder) ship too — adding another
-  site is one pack file + one manifest entry.
+  avatars recolored from your terminal palette), GitHub (Primer design tokens),
+  Linear (sidebar + elevation ladder), Discord, and Outlook Web (Fluent v9
+  tokens) ship too — adding another site is one pack file + one manifest entry.
 
 https://github.com/user-attachments/assets/83787af6-7c41-4449-9460-c7f67b21aa5b
 
@@ -97,8 +97,9 @@ because both live under `$HOME`. It takes the same `--no-flags` and
 `--uninstall` flags as `install.sh` below; they're the same script. (Upgrading
 from `omarchy-slack-theme`? The setup cleans up the old name's wiring too.)
 
-Then fully quit your browser and open `app.slack.com`, `web.whatsapp.com`, or
-`github.com`.
+Then fully quit your browser and open any supported site — `app.slack.com`,
+`web.whatsapp.com`, `github.com`, `linear.app`, `discord.com`, or
+`outlook.office.com`.
 
 On GitHub, only the app is themed. The marketing site (`/features/*`, `/pricing`,
 `/resources/*`, `/open-source`, and the signed-out homepage) is left as GitHub
@@ -207,6 +208,8 @@ extension/
 ├── whatsapp.js                     # the WhatsApp pack: declarative CSS-var table
 ├── github.js                       # the GitHub pack: Primer CSS-var table
 ├── linear.js                       # the Linear pack: semantic CSS-var table
+├── discord.js                      # the Discord pack: declarative CSS-var table
+├── outlook.js                      # the Outlook pack: Fluent v9 CSS-var table
 └── inject-prefers-color-scheme.js  # MAIN-world: matchMedia polyfill + React-click bridge
 
 native-host/
