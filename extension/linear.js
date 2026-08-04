@@ -103,11 +103,15 @@ function linearGreyLevel(rgb) {
 }
 
 function linearElevation(s) {
+  // Steps are deliberately wider than Linear's own (its light greys sit inside
+  // lch 94-100, which is nearly invisible once recoloured) and the upper rungs
+  // pick up a little accent so panels differ in hue as well as value — a purely
+  // tonal ladder on a warm background reads as one flat colour.
   return {
     bgPrimary: s.bg,
-    bgSecondary: shade(s.bg, s.dir * 0.035),
-    bgTertiary: shade(s.bg, s.dir * 0.055),
-    bgQuaternary: shade(s.bg, s.dir * 0.08),
+    bgSecondary: shade(s.bg, s.dir * 0.05),
+    bgTertiary: mix(shade(s.bg, s.dir * 0.09), s.accent, 0.05),
+    bgQuaternary: mix(shade(s.bg, s.dir * 0.13), s.accent, 0.08),
     sidebar: s.sidebarBg,
     sidebarDeep: shade(s.sidebarBg, -s.dir * 0.03),
   };
@@ -247,12 +251,24 @@ function linearDominantRole(counts) {
   return top;
 }
 
-function linearSurfaceBucket(level, elev) {
+// Absolute thresholds threw Linear's elevation information away: its light-mode
+// surfaces all sit within lch 94-100, so every one landed on the first rung and
+// the whole app collapsed to a single flat colour. Instead, rank each slot
+// WITHIN the range actually observed this pass, so whatever spread Linear uses
+// gets stretched across the full ladder — relative ordering preserved, contrast
+// made visible. `stats` carries {min,max} of the surface levels; without it (a
+// single slot, or all equal) everything sensibly stays on bgPrimary.
+function linearSurfaceBucket(level, elev, stats) {
   const rank = level < 0.5 ? level : 1 - level;
   if (rank > 0.32) return null; // not a plausible chrome grey
-  if (rank < 0.055) return elev.bgPrimary;
-  if (rank < 0.1) return elev.bgSecondary;
-  if (rank < 0.15) return elev.bgTertiary;
+  if (!stats || !(stats.max > stats.min)) return elev.bgPrimary;
+  // 0 = closest to the page surface, 1 = furthest from it.
+  const t = (stats.max - rank === 0 && stats.min === rank)
+    ? 0
+    : (rank - stats.min) / (stats.max - stats.min);
+  if (t < 0.25) return elev.bgPrimary;
+  if (t < 0.55) return elev.bgSecondary;
+  if (t < 0.8) return elev.bgTertiary;
   return elev.bgQuaternary;
 }
 
@@ -323,6 +339,11 @@ function linearSxRemaps(s) {
   const roles = linearSxRoles();
   const borderNormal = s.borderColor;
   const borderStrong = withAlpha(s.fg, s.isDark ? 0.16 : 0.14);
+
+  // First pass: resolve every slot once, and record the spread of the SURFACE
+  // ranks so the ladder can be scaled to the range Linear actually uses.
+  const resolved = [];
+  const surfaceStats = { min: Infinity, max: -Infinity };
   for (const prop of names) {
     const value =
       linearPristine.get(prop) || original[prop] || cs.getPropertyValue(prop).trim();
@@ -334,10 +355,21 @@ function linearSxRemaps(s) {
     const role = linearDominantRole(roles[prop]);
     if (!role) continue; // no consumer, or genuinely dual-purpose
     const level = linearGreyLevel(rgb);
+    if (role === "surface") {
+      const rank = level < 0.5 ? level : 1 - level;
+      if (rank <= 0.32) {
+        if (rank < surfaceStats.min) surfaceStats.min = rank;
+        if (rank > surfaceStats.max) surfaceStats.max = rank;
+      }
+    }
+    resolved.push([prop, role, level]);
+  }
+
+  for (const [prop, role, level] of resolved) {
     let bucket = null;
     if (role === "hover") bucket = s.hoverBg;
     else if (role === "selected") bucket = s.selectedBg;
-    else if (role === "surface") bucket = linearSurfaceBucket(level, elev);
+    else if (role === "surface") bucket = linearSurfaceBucket(level, elev, surfaceStats);
     else if (role === "text") bucket = linearTextBucket(level, text);
     else if (role === "border")
       bucket = Math.abs(level - 0.5) * 2 > 0.5 ? borderStrong : borderNormal;
