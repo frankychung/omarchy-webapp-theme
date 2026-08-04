@@ -36,12 +36,31 @@ script.
     list/header paint via the `--WDS-surface-*` semantic tokens, found by
     resolving every custom property at the element and matching the painted
     color. Requires WhatsApp's theme set to "System default".
-  - `github.js` — **the GitHub pack** (declarative tier): maps Primer semantic
+  - `github.js` — **the GitHub pack** (mostly declarative): maps Primer semantic
     tokens (`--bgColor-*`, `--fgColor-*`, `--borderColor-*`, `--header-*`,
     `--control-*`, `--overlay-*`) to derived surfaces. Verified via Playwright
     against public github.com (2026-08-04). `onColorMode` pins
     `data-color-mode`; Appearance → "Sync with system" is the supported setup.
     Matches `github.com` and `gist.github.com`.
+    Also maps the `--brand-color-*` family: **signed-out GitHub is a second
+    design system**, and its header/mega-menu read
+    `var(--brand-color-canvas-default, var(--bgColor-default))` — since GitHub
+    defines the brand token, the Primer fallback never applies. Only the ~37
+    primitives are mapped; the ~560 per-component `--brand-<Component>-*` tokens
+    are build-time literals, not references to them.
+    **Skips GitHub's marketing site** (`/features/*`, `/pricing`, `/resources/*`,
+    `/open-source`, the signed-out homepage, …): those pages deliberately mix
+    dark and light heroes, so one omarchy surface flattens them. Detected by
+    GitHub's own routing — `<meta name="route-controller">` starting with
+    `site_` — never a URL prefix list, which would rot as pages are added.
+    Opting out is simply *not registering*; the engine holds and replays the
+    theme while no pack exists, so such pages get zero side effects. The pack
+    runs at `document_start`, so it waits on a MutationObserver for that meta
+    rather than `DOMContentLoaded`, which would flash unthemed app pages.
+    Its small `apply` hook exists for one thing: GitHub fills the header search
+    icon from `--fgColor-onEmphasis`, which correctly resolves to the page
+    background on dark themes — right for text on an accent fill, invisible
+    here — so that selector is overridden instead of the token retuned.
   - `linear.js` — **the Linear pack**: semantic tokens (`--bg-*`, `--color-*`,
     `--focus-*`) plus a dynamic remap of Linear's hashed StyleX `--sx-*` slots,
     each classified by USAGE (which CSS property consumes it — background →
