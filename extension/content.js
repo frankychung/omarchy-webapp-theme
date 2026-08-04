@@ -350,6 +350,42 @@ function applySlackTheme(theme, s) {
       border-color: transparent !important;
     }
 
+    /* The wide [class*="c-tabs"] net above is for the channel-header tab strip,
+       but the LEFT RAIL's buttons are c-tabs__* elements too, so their
+       tab_content spans were picking up the message-pane bg. On dark themes
+       that's invisible; on light ones it painted a cream pill behind every rail
+       icon and label. The rail's own surface (plus its inline chromeBg paint)
+       is already correct — the tabs inside it need no fill.
+       Rail containers escape the c-tabs rule only because directPaint sets them
+       inline, which is why this went unnoticed.
+       The :not() pair is NOT decoration — the rule above carries two of them,
+       so it scores (0,3,2); a plain two-attribute descendant selector loses to
+       it even though it comes later. Matching its :not()s puts us at (0,4,2). */
+    html body [class*="tab_rail"] [class*="c-tabs__tab"]:not([class*="prefs"]):not([data-qa="tabs_full_width_class"]),
+    html body [class*="p-ia4_tab_rail"] [class*="c-tabs__tab"]:not([class*="prefs"]):not([data-qa="tabs_full_width_class"]),
+    html body [class*="workspace_switcher"] [class*="c-tabs__tab"]:not([class*="prefs"]):not([data-qa="tabs_full_width_class"]) {
+      background-color: transparent !important;
+    }
+
+    /* Reaction chips. Slack fills them with its own near-black 6% wash and dark
+       ink, and paints the "you reacted" state pale blue with blue text — none of
+       it theme-aware, so on light themes they read as washed-out pills floating
+       on the message. Derive all three from the theme instead. */
+    html body [class*="c-reaction"]:not([class*="c-reaction_bar"]) {
+      background-color: ${withAlpha(fg, 0.07)} !important;
+      color: var(--omarchy-fg) !important;
+      border-color: var(--omarchy-border) !important;
+    }
+    html body [class*="c-reaction"][aria-pressed="true"],
+    html body [class*="c-reaction--reacted"] {
+      background-color: ${withAlpha(accent, 0.18)} !important;
+      color: var(--omarchy-fg-strong) !important;
+      border-color: ${withAlpha(accent, 0.45)} !important;
+    }
+    html body [class*="c-reaction__count"] {
+      color: inherit !important;
+    }
+
     /* "Jump to first unread" / "N new messages" floating pill at the top of
        the message pane. Painted with the theme accent so it pops, with text
        in theme.bg for contrast against the saturated fill. */
