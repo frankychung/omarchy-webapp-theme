@@ -4,10 +4,12 @@
   "version": "0.3.0",
   "description": "Make web apps (Slack, WhatsApp, ...) follow the current Omarchy theme: palette, light/dark, and accent.",
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEArJSIwQv/78rvsaA9dVcTZe+lO4JPxjYFOazJiLCsGt7Rp4L6fQy7G6Wllteg/ueE2qWO7NDs0wmNkchE0xjqsPU3BQCzzNM6hevscKdZ0k8QXbEr4L+C+jwC/VPkD73soaKQncnDWtGsA9VLVIom6wWkr0qcop7QNE1+wXdx/n7b/5v192/STiunFMuUNLpEiYzWMwQZtydVtRms1jJvSHE7C9ye9QT6z/dTYJs9LeyREI5HNxzhUMIeWlh44QS6jlf40jnsTJvXJ6FJedQ3C0FhD9i6Tw7+/+XgtU64dQJ2RahP8SpsfHD6TTh4Tfnnw1D6zjjaPyi8pn1DY7nHiQIDAQAB",
-  "permissions": ["nativeMessaging", "storage"],
+  "permissions": [
+    "nativeMessaging",
+    "storage"
+  ],
   "host_permissions": [
     "*://app.slack.com/*",
-    "*://*.slack.com/*",
     "*://web.whatsapp.com/*",
     "*://github.com/*",
     "*://gist.github.com/*",
@@ -22,7 +24,6 @@
     {
       "matches": [
         "*://app.slack.com/*",
-        "*://*.slack.com/*",
         "*://web.whatsapp.com/*",
         "*://github.com/*",
         "*://gist.github.com/*",
@@ -30,7 +31,9 @@
         "*://*.linear.app/*",
         "*://discord.com/*"
       ],
-      "js": ["inject-prefers-color-scheme.js"],
+      "js": [
+        "inject-prefers-color-scheme.js"
+      ],
       "run_at": "document_start",
       "all_frames": false,
       "world": "MAIN"
@@ -38,7 +41,6 @@
     {
       "matches": [
         "*://app.slack.com/*",
-        "*://*.slack.com/*",
         "*://web.whatsapp.com/*",
         "*://github.com/*",
         "*://gist.github.com/*",
@@ -55,32 +57,54 @@
       "all_frames": false
     },
     {
-      "matches": ["*://app.slack.com/*", "*://*.slack.com/*"],
-      "js": ["content.js"],
+      "matches": [
+        "*://app.slack.com/*"
+      ],
+      "js": [
+        "content.js"
+      ],
       "run_at": "document_start",
       "all_frames": false
     },
     {
-      "matches": ["*://web.whatsapp.com/*"],
-      "js": ["whatsapp.js"],
+      "matches": [
+        "*://web.whatsapp.com/*"
+      ],
+      "js": [
+        "whatsapp.js"
+      ],
       "run_at": "document_start",
       "all_frames": false
     },
     {
-      "matches": ["*://github.com/*", "*://gist.github.com/*"],
-      "js": ["github.js"],
+      "matches": [
+        "*://github.com/*",
+        "*://gist.github.com/*"
+      ],
+      "js": [
+        "github.js"
+      ],
       "run_at": "document_start",
       "all_frames": false
     },
     {
-      "matches": ["*://linear.app/*", "*://*.linear.app/*"],
-      "js": ["linear.js"],
+      "matches": [
+        "*://linear.app/*",
+        "*://*.linear.app/*"
+      ],
+      "js": [
+        "linear.js"
+      ],
       "run_at": "document_start",
       "all_frames": false
     },
     {
-      "matches": ["*://discord.com/*"],
-      "js": ["discord.js"],
+      "matches": [
+        "*://discord.com/*"
+      ],
+      "js": [
+        "discord.js"
+      ],
       "run_at": "document_start",
       "all_frames": false
     }
