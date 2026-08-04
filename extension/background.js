@@ -1,4 +1,4 @@
-const HOST = "com.omarchy.slack_theme";
+const HOST = "com.omarchy.webapp_theme";
 
 // Every site a pack supports, straight from the manifest's content-script
 // matches — adding a pack never touches this file.

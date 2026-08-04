@@ -1,5 +1,5 @@
 #!/bin/bash
-# Wire up the Omarchy Slack Theme extension for the current user: the omarchy
+# Wire up the Omarchy Web App Theme extension for the current user: the omarchy
 # theme-set hook, the browser --load-extension flag, and — outside a packaged
 # install — the native-messaging host manifests.
 #
@@ -14,40 +14,40 @@
 # so it's the same on every machine and is baked into the host manifest.
 #
 # This same script ships twice: as ./install.sh in a git checkout, and as
-# /usr/bin/omarchy-slack-theme-setup in the AUR package. It figures out which it
+# /usr/bin/omarchy-webapp-theme-setup in the AUR package. It figures out which it
 # is from its own path, so there's only ever one copy of this logic to maintain.
 
 set -euo pipefail
 
 SELF="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/$(basename -- "${BASH_SOURCE[0]}")"
-SHARE_DIR="/usr/share/omarchy-slack-theme"
+SHARE_DIR="/usr/share/omarchy-webapp-theme"
 
 REPO="$(dirname -- "$SELF")"
 
 # Decide by what's actually next to us, not by our own filename — a checkout can
 # be cloned to any directory, and the package may be installed at the same time.
-if [[ -f "$REPO/native-host/omarchy-slack-theme-host" ]]; then
+if [[ -f "$REPO/native-host/omarchy-webapp-theme-host" ]]; then
   # Git checkout: everything lives beside this script, and we own the per-user
   # native-messaging manifests too since there's no package to place them.
   PACKAGED=0
-  HOST_SCRIPT="$REPO/native-host/omarchy-slack-theme-host"
-  HOST_TEMPLATE="$REPO/native-host/com.omarchy.slack_theme.json.template"
-  HOOK_SCRIPT="$REPO/hooks/omarchy-slack-theme"
+  HOST_SCRIPT="$REPO/native-host/omarchy-webapp-theme-host"
+  HOST_TEMPLATE="$REPO/native-host/com.omarchy.webapp_theme.json.template"
+  HOOK_SCRIPT="$REPO/hooks/omarchy-webapp-theme"
   EXT_DIR="$REPO/extension"
 elif [[ -d $SHARE_DIR ]]; then
   # Packaged: pacman owns the host binary and the system-wide manifests under
   # /etc, so all that's left for us is the per-user wiring.
   PACKAGED=1
-  HOST_SCRIPT="/usr/bin/omarchy-slack-theme-host"
+  HOST_SCRIPT="/usr/bin/omarchy-webapp-theme-host"
   HOST_TEMPLATE=""
-  HOOK_SCRIPT="$SHARE_DIR/hooks/omarchy-slack-theme"
+  HOOK_SCRIPT="$SHARE_DIR/hooks/omarchy-webapp-theme"
   EXT_DIR="$SHARE_DIR/extension"
 else
   echo "Error: can't find the extension files (looked beside $SELF and in $SHARE_DIR)." >&2
   exit 1
 fi
 
-HOST_NAME="com.omarchy.slack_theme"
+HOST_NAME="com.omarchy.webapp_theme"
 
 # The pinned extension ID, read back from whichever manifest this mode has so
 # it stays single-sourced rather than duplicated here. Purely cosmetic — it's
@@ -62,7 +62,7 @@ ext_id() {
   done
   printf 'the pinned ID'
 }
-MARKER="omarchy-slack-theme"
+MARKER="omarchy-webapp-theme"
 
 HOOKS_DIR="$HOME/.config/omarchy/hooks"
 
@@ -169,6 +169,44 @@ remove_hook() {
   fi
 }
 
+# ------------------------------------------------------- legacy (pre-rename) --
+
+# Through 0.2.x this project was "omarchy-slack-theme". Clean up any wiring the
+# old name left behind so an upgrade doesn't strand a dead host manifest, hook
+# symlink, or --load-extension entry pointing at the old package path.
+OLD_HOST_NAME="com.omarchy.slack_theme"
+OLD_MARKER="omarchy-slack-theme"
+OLD_SHARE_EXT="/usr/share/omarchy-slack-theme/extension"
+
+remove_legacy() {
+  local dir entry name file cleaned=0
+  for dir in "${BROWSER_PROFILE_DIRS[@]}"; do
+    [[ -f "$dir/NativeMessagingHosts/$OLD_HOST_NAME.json" ]] || continue
+    rm -f "$dir/NativeMessagingHosts/$OLD_HOST_NAME.json"
+    cleaned=1
+  done
+  if [[ -L "$HOOKS_DIR/theme-set.d/$OLD_MARKER" || -f "$HOOKS_DIR/theme-set.d/$OLD_MARKER" ]]; then
+    rm -f "$HOOKS_DIR/theme-set.d/$OLD_MARKER"
+    cleaned=1
+  fi
+  for entry in "${FLAGS_TARGETS[@]}"; do
+    name="${entry%%:*}"
+    file="$HOME/.config/$name-flags.conf"
+    [[ -f $file ]] || continue
+    grep -qF "$OLD_SHARE_EXT" "$file" || continue
+    sed -i --follow-symlinks \
+      -e "s|^\(--load-extension=.*\),$OLD_SHARE_EXT\$|\1|" \
+      -e "s|^\(--load-extension=.*\),$OLD_SHARE_EXT,|\1,|" \
+      -e "s|^--load-extension=$OLD_SHARE_EXT,|--load-extension=|" \
+      -e "\|^--load-extension=$OLD_SHARE_EXT\$|d" \
+      "$file"
+    [[ -s $file ]] || rm -f "$file"
+    cleaned=1
+  done
+  ((cleaned)) && echo "  cleaned up old omarchy-slack-theme wiring"
+  return 0
+}
+
 # ---------------------------------------------------------------- browser flags --
 
 install_flags() {
@@ -217,13 +255,14 @@ remove_flags() {
 # --------------------------------------------------------------------- main --
 
 if ((DO_UNINSTALL)); then
-  echo "Uninstalling Omarchy Slack Theme..."
+  echo "Uninstalling Omarchy Web App Theme..."
   ((PACKAGED)) || remove_host_manifests
   remove_hook
   remove_flags
+  remove_legacy
   echo
   if ((PACKAGED)); then
-    echo "Done. Fully restart your browser, then 'pacman -R omarchy-slack-theme'"
+    echo "Done. Fully restart your browser, then 'pacman -R omarchy-webapp-theme'"
     echo "to remove the package itself."
   else
     echo "Done. Fully restart your browser to finish."
@@ -250,7 +289,8 @@ for f in "$HOST_SCRIPT" "$HOOK_SCRIPT" ${HOST_TEMPLATE:+"$HOST_TEMPLATE"}; do
 done
 ((PACKAGED)) || chmod +x "$HOST_SCRIPT" "$HOOK_SCRIPT" 2>/dev/null || true
 
-echo "Setting up Omarchy Slack Theme..."
+echo "Setting up Omarchy Web App Theme..."
+remove_legacy
 if ((PACKAGED)); then
   echo "  native-messaging host: /etc/chromium/native-messaging-hosts (owned by the package)"
 else
@@ -274,4 +314,4 @@ if ((DO_FLAGS)); then
 else
   echo "  2. Load $EXT_DIR unpacked via Developer mode."
 fi
-echo "  3. Open app.slack.com and switch omarchy themes."
+echo "  3. Open app.slack.com (or web.whatsapp.com, github.com) and switch omarchy themes."

@@ -1,13 +1,16 @@
-# omarchy-slack-theme
+# omarchy-webapp-theme
 
-A tiny browser extension that makes the Slack web app follow your
-[Omarchy](https://omarchy.org/) theme — including auto-flipping Slack's
-Light/Dark Color Mode whenever you switch omarchy themes, and painting the
-main message pane with your terminal's background color so Slack visually
-blends into the rest of your desktop.
+A tiny browser extension that makes web apps — **Slack, WhatsApp Web, and
+GitHub** — follow your [Omarchy](https://omarchy.org/) theme: painting their
+surfaces with your terminal's palette and flipping their Light/Dark mode
+whenever you switch omarchy themes, so they visually blend into the rest of
+your desktop.
 
-Built and tested on Brave on Arch Linux + Omarchy. Should work on Chrome and
-Chromium with one flag change to `install.sh`.
+Built and tested on Brave on Arch Linux + Omarchy. Works on Chrome, Chromium,
+and Edge.
+
+> Known as `omarchy-slack-theme` through 0.2.x, back when Slack was the only
+> pack.
 
 ## What it does
 
@@ -22,15 +25,17 @@ Chromium with one flag change to `install.sh`.
   native-messaging host hooks into omarchy's own `theme-set` event and pushes
   the new state to the extension the moment the theme lands.
 - **Not just Slack**: the extension is a theme engine plus one small "pack" per
-  site. A WhatsApp Web pack ships too (experimental), and adding another site
-  is one pack file + one manifest entry.
+  site. WhatsApp Web (surfaces, bubbles, unread badges, and even default
+  avatars recolored from your terminal palette) and GitHub (Primer design
+  tokens) ship too — and adding another site is one pack file + one manifest
+  entry.
 
 https://github.com/user-attachments/assets/83787af6-7c41-4449-9460-c7f67b21aa5b
 
 ## How it works
 
 ```
-  omarchy-theme-set ──omarchy-hook theme-set──► hooks/omarchy-slack-theme
+  omarchy-theme-set ──omarchy-hook theme-set──► hooks/omarchy-webapp-theme
                                                           │ SIGUSR1
                                                           ▼
 ┌──────────────┐   length-prefixed JSON   ┌────────────────────┐
@@ -81,17 +86,19 @@ background — robust to themes that don't use the obvious day/night naming
 ### From the AUR
 
 ```sh
-yay -S omarchy-slack-theme
-omarchy-slack-theme-setup
+yay -S omarchy-webapp-theme
+omarchy-webapp-theme-setup
 ```
 
 The package registers the native-messaging host system-wide, so there's no
-per-browser setup. `omarchy-slack-theme-setup` does the two things a package
+per-browser setup. `omarchy-webapp-theme-setup` does the two things a package
 can't — installing the omarchy `theme-set` hook and adding `--load-extension` —
 because both live under `$HOME`. It takes the same `--no-flags` and
-`--uninstall` flags as `install.sh` below; they're the same script.
+`--uninstall` flags as `install.sh` below; they're the same script. (Upgrading
+from `omarchy-slack-theme`? The setup cleans up the old name's wiring too.)
 
-Then fully quit your browser and open `app.slack.com`.
+Then fully quit your browser and open `app.slack.com`, `web.whatsapp.com`, or
+`github.com`.
 
 ### From a git checkout
 
@@ -191,15 +198,16 @@ extension/
 ├── omarchy-surfaces.js             # engine: deriveSurfaces() -- theme -> surfaces
 ├── omarchy-runtime.js              # engine: OmarchyTheme registry + theme dispatch
 ├── content.js                      # the Slack pack: injects CSS + drives prefs automation
-├── whatsapp.js                     # the WhatsApp pack: declarative CSS-var table (experimental)
+├── whatsapp.js                     # the WhatsApp pack: declarative CSS-var table
+├── github.js                       # the GitHub pack: Primer CSS-var table
 └── inject-prefers-color-scheme.js  # MAIN-world: matchMedia polyfill + React-click bridge
 
 native-host/
-├── omarchy-slack-theme-host        # bash; pushes length-prefixed JSON over stdio
-└── com.omarchy.slack_theme.json.template
+├── omarchy-webapp-theme-host       # bash; pushes length-prefixed JSON over stdio
+└── com.omarchy.webapp_theme.json.template
 
 hooks/
-└── omarchy-slack-theme             # theme-set hook; SIGUSRs every running host
+└── omarchy-webapp-theme            # theme-set hook; SIGUSRs every running host
 
 install.sh                          # host manifests + hook + --load-extension wiring
 ```

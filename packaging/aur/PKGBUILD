@@ -1,14 +1,15 @@
 # Maintainer: Scott Jones <scottajones@gmail.com>
 
-pkgname=omarchy-slack-theme
-pkgver=0.2.0
+pkgname=omarchy-webapp-theme
+pkgver=0.3.0
 pkgrel=1
-pkgdesc="Make the Slack web app follow your current Omarchy theme"
+pkgdesc="Make web apps (Slack, WhatsApp, GitHub) follow your current Omarchy theme"
 arch=('any')
-url="https://github.com/scottjones/omarchy-slack-theme"
+url="https://github.com/scottjones/omarchy-webapp-theme"
 license=('MIT')
 # The host is pure bash + coreutils; coreutils is part of base, so bash is the
-# only thing worth declaring.
+# only thing worth declaring. Omarchy 4+ is a hard runtime requirement, but it
+# isn't a pacman package — omarchy-webapp-theme-setup enforces it at runtime.
 depends=('bash')
 optdepends=(
   'omarchy: Omarchy 4+ required -- provides the theme it reads and the theme-set hook'
@@ -16,31 +17,37 @@ optdepends=(
   'brave-bin: supported browser'
   'google-chrome: supported browser'
 )
+# This package was omarchy-slack-theme through 0.2.x, before it grew packs for
+# more sites than Slack.
+replaces=('omarchy-slack-theme')
+conflicts=('omarchy-slack-theme')
+provides=('omarchy-slack-theme')
 install="$pkgname.install"
 source=("$pkgname-$pkgver.tar.gz::$url/archive/refs/tags/v$pkgver.tar.gz")
-sha256sums=('3a43a53c408fe86afb9c24bcdd4a63f8554f874157950a8d234029755164e830')
+# Pin to the sha256 of the published v0.3.0 tag tarball before releasing.
+sha256sums=('SKIP')
 
 package() {
   cd "$srcdir/$pkgname-$pkgver"
 
   # The native-messaging host, at a stable path the system manifests point to.
-  install -Dm755 native-host/omarchy-slack-theme-host \
-    "$pkgdir/usr/bin/omarchy-slack-theme-host"
+  install -Dm755 native-host/omarchy-webapp-theme-host \
+    "$pkgdir/usr/bin/omarchy-webapp-theme-host"
 
   # install.sh does double duty: ./install.sh in a checkout, and the per-user
   # setup command here. It detects which by looking for the repo layout beside
   # itself, so installed at this path it only does the per-user wiring.
-  install -Dm755 install.sh "$pkgdir/usr/bin/omarchy-slack-theme-setup"
+  install -Dm755 install.sh "$pkgdir/usr/bin/omarchy-webapp-theme-setup"
 
   # The unpacked extension. Users get it via --load-extension, pointed here by
-  # omarchy-slack-theme-setup.
+  # omarchy-webapp-theme-setup.
   install -dm755 "$pkgdir/usr/share/$pkgname/extension"
   install -Dm644 -t "$pkgdir/usr/share/$pkgname/extension" extension/*
 
   # The omarchy theme-set hook. Can't be installed into ~ from a package, so
-  # omarchy-slack-theme-setup links it into the user's hooks dir.
-  install -Dm755 hooks/omarchy-slack-theme \
-    "$pkgdir/usr/share/$pkgname/hooks/omarchy-slack-theme"
+  # omarchy-webapp-theme-setup links it into the user's hooks dir.
+  install -Dm755 hooks/omarchy-webapp-theme \
+    "$pkgdir/usr/share/$pkgname/hooks/omarchy-webapp-theme"
 
   # System-wide native-messaging manifests, so no per-user registration is
   # needed. Verified against the shipped binaries' compiled-in search paths:
@@ -49,15 +56,15 @@ package() {
   # Edge is best-effort: its path follows the same convention but is untested,
   # and an unused manifest is inert.
   local manifest
-  manifest="$(sed 's|__HOST_PATH__|/usr/bin/omarchy-slack-theme-host|' \
-    native-host/com.omarchy.slack_theme.json.template)"
+  manifest="$(sed 's|__HOST_PATH__|/usr/bin/omarchy-webapp-theme-host|' \
+    native-host/com.omarchy.webapp_theme.json.template)"
 
   local d
   for d in /etc/chromium /etc/opt/chrome /etc/opt/edge; do
     install -dm755 "$pkgdir$d/native-messaging-hosts"
     printf '%s\n' "$manifest" \
-      >"$pkgdir$d/native-messaging-hosts/com.omarchy.slack_theme.json"
-    chmod 644 "$pkgdir$d/native-messaging-hosts/com.omarchy.slack_theme.json"
+      >"$pkgdir$d/native-messaging-hosts/com.omarchy.webapp_theme.json"
+    chmod 644 "$pkgdir$d/native-messaging-hosts/com.omarchy.webapp_theme.json"
   done
 
   install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"

@@ -8,10 +8,11 @@ A small **Manifest V3 browser extension** (Brave/Chrome/Chromium) that makes
 web apps follow the current [Omarchy](https://omarchy.org/) theme. One
 app-agnostic **engine** + one **pack per site**: Slack (`content.js`, the full
 pack — repaints chrome/sidebar/message pane and auto-flips Slack's Light/Dark
-Color Mode) and WhatsApp Web (`whatsapp.js`, a declarative pack — experimental).
-A **bash native-messaging host** reads the active Omarchy theme from
-`~/.local/state/omarchy/current/` and pushes theme changes to the extension the
-moment they land. **Requires Omarchy 4+.**
+Color Mode), WhatsApp Web (`whatsapp.js`, declarative), and GitHub
+(`github.js`, declarative Primer tokens). A **bash native-messaging host**
+reads the active Omarchy theme from `~/.local/state/omarchy/current/` and
+pushes theme changes to the extension the moment they land. **Requires
+Omarchy 4+.**
 
 This is end-user desktop tooling, not a web service. There is no build step, no
 package manager, and no test suite — it's plain JS plus a dependency-free bash
@@ -35,6 +36,12 @@ script.
     list/header paint via the `--WDS-surface-*` semantic tokens, found by
     resolving every custom property at the element and matching the painted
     color. Requires WhatsApp's theme set to "System default".
+  - `github.js` — **the GitHub pack** (declarative tier): maps Primer semantic
+    tokens (`--bgColor-*`, `--fgColor-*`, `--borderColor-*`, `--header-*`,
+    `--control-*`, `--overlay-*`) to derived surfaces. Verified via Playwright
+    against public github.com (2026-08-04). `onColorMode` pins
+    `data-color-mode`; Appearance → "Sync with system" is the supported setup.
+    Matches `github.com` and `gist.github.com`.
   - `background.js` — MV3 service worker. Holds the native-messaging port,
     rebroadcasts pushed themes to matched tabs (the site list is derived from
     the manifest's content-script matches — adding a pack never touches this
@@ -48,10 +55,10 @@ script.
     on every machine, so the host manifest's `allowed_origins` can be hardcoded.
     Never regenerate it — the ID is baked into the host manifest template and
     into users' installed copies.
-- `native-host/` — `omarchy-slack-theme-host` (bash; emits length-prefixed JSON
+- `native-host/` — `omarchy-webapp-theme-host` (bash; emits length-prefixed JSON
   over stdio) + the native-messaging manifest template.
-- `hooks/omarchy-slack-theme` — omarchy `theme-set` hook. Signals SIGUSR1 to
-  every running host via pidfiles in `$XDG_RUNTIME_DIR/omarchy-slack-theme/`.
+- `hooks/omarchy-webapp-theme` — omarchy `theme-set` hook. Signals SIGUSR1 to
+  every running host via pidfiles in `$XDG_RUNTIME_DIR/omarchy-webapp-theme/`.
 - `install.sh` — takes no extension ID. Refuses on pre-Omarchy-4 (no
   `~/.local/state/omarchy/current`). Otherwise writes host manifests to all nine
   Chromium-family profile dirs, symlinks the hook into `hooks/theme-set.d/`, and
@@ -170,7 +177,7 @@ do that rather than asking the user to click through a browser. Both honor
 
 ```sh
 # host: hold stdin open, or the watchdog exits immediately
-( sleep 5 ) | HOME=/tmp/fake XDG_RUNTIME_DIR=/tmp/run ./native-host/omarchy-slack-theme-host > out.bin
+( sleep 5 ) | HOME=/tmp/fake XDG_RUNTIME_DIR=/tmp/run ./native-host/omarchy-webapp-theme-host > out.bin
 head -c4 out.bin | od -An -v -tu4 --endian=little   # must equal the JSON byte length
 
 # install.sh: sandbox the whole thing
