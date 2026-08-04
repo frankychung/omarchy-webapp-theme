@@ -82,7 +82,13 @@ function applySlackTheme(theme, s) {
     html body [class*="p-workspace__primary_view"],
     html body [class*="primary_view_body"],
     html body [class*="primary_view_contents"],
-    html body [class*="view_contents"],
+    /* NOT the sidebar variant: p-view_contents--sidebar contains "view_contents"
+       too, so it was taking the message-pane colour. That left the sidebar panel
+       painted like the message pane while the search-filter strip inside it kept
+       the real sidebar colour (directPaint sets that one inline), which showed up
+       as a stray rectangle around the search box, ending where the channel list
+       began. The sidebar block below owns that element. */
+    html body [class*="view_contents"]:not([class*="--sidebar"]),
     html body [class*="tabbed_channel"],
     html body [class*="channel_tab_panel"],
     html body [class*="p-message_pane"],
@@ -185,6 +191,8 @@ function applySlackTheme(theme, s) {
     html body [class*="p-ia__sidebar"],
     html body [class*="p-ia4__sidebar"],
     html body [class*="sidebar_layout"],
+    html body [class*="view_contents--sidebar"],
+    html body [class*="sidebar_text_filter_input_header"],
     html body [class*="rainbow"] {
       background-color: var(--omarchy-sidebar-bg) !important;
       color: var(--omarchy-fg) !important;
@@ -365,6 +373,36 @@ function applySlackTheme(theme, s) {
     html body [class*="p-ia4_tab_rail"] [class*="c-tabs__tab"]:not([class*="prefs"]):not([data-qa="tabs_full_width_class"]),
     html body [class*="workspace_switcher"] [class*="c-tabs__tab"]:not([class*="prefs"]):not([data-qa="tabs_full_width_class"]) {
       background-color: transparent !important;
+    }
+
+    /* Rail tab labels and their keyboard-shortcut hints. The rail rule above
+       matches these (their classes contain "tab_rail") and gives each an opaque
+       fill, so the text sits in a hard-edged rectangle instead of on the rail —
+       most obvious on the active tab, and it vanishes on hover, which is exactly
+       what makes the resting state look wrong. They carry no surface of their
+       own; let the rail show through. The active tab's icon outline is Slack's
+       selected-tab affordance and is deliberately left alone. */
+    html body [class*="tab_rail"] [class*="button__label"],
+    html body [class*="tab_rail"] [class*="shortcut_hint"] {
+      background-color: transparent !important;
+    }
+
+    /* Sidebar "Find a conversation…" filter input. Slack fills this with a
+       hardcoded rgba(255,255,255,.9) plus a near-black hairline, so on a tinted
+       sidebar it reads as a pale card floating over the list rather than an
+       input. Give it the same treatment as the composer: a faint wash of the
+       theme's own foreground, with our border. */
+    html body [class*="c-filter_input"],
+    html body [data-qa="sidebar-text-filter-input"] {
+      background-color: ${withAlpha(fg, 0.06)} !important;
+      border-color: var(--omarchy-border) !important;
+      color: var(--omarchy-fg) !important;
+    }
+    html body [class*="c-filter_input"] input,
+    html body [class*="c-filter_input"] [class*="icon"],
+    html body [data-qa="sidebar-text-filter-input"] input {
+      background-color: transparent !important;
+      color: var(--omarchy-fg) !important;
     }
 
     /* Reaction chips. Slack fills them with its own near-black 6% wash and dark
@@ -779,11 +817,20 @@ function applySlackTheme(theme, s) {
   // back the cascade.
   const directPaint = [
     [
-      '[class*="tab_rail"], [class*="workspace_switcher"], [class*="nav_rail"], [class*="rail__nav"], [class*="p-ia4_tab_rail"], [class*="p-ia__nav"]',
+      // The :not()s matter: these are substring matches, so "tab_rail" also hits
+      // p-tab_rail__button__label and __shortcut_hint. Painting those inline
+      // stamps an opaque rectangle behind each label — and because inline
+      // !important outranks every stylesheet rule, no CSS override can undo it.
+      // Only the rail's own surfaces belong here.
+      '[class*="tab_rail"]:not([class*="button__label"]):not([class*="shortcut_hint"]), [class*="workspace_switcher"], [class*="nav_rail"], [class*="rail__nav"], [class*="p-ia4_tab_rail"], [class*="p-ia__nav"]',
       chromeBg,
     ],
     [
-      '[class*="channel_sidebar"], [class*="p-channel_sidebar"], [class*="p-ia4_channel_sidebar"], [class*="left_nav"], [class*="sidebar_list"], [class*="p-ia__sidebar"], [class*="p-ia4__sidebar"], [class*="sidebar_layout"]',
+      // view_contents--sidebar is the sidebar PANEL — it has to be painted with
+      // the sidebar colour here too, or the strips inside it that directPaint
+      // does reach (the search-filter header) end up a different colour from the
+      // panel they sit on.
+      '[class*="channel_sidebar"], [class*="p-channel_sidebar"], [class*="p-ia4_channel_sidebar"], [class*="left_nav"], [class*="sidebar_list"], [class*="p-ia__sidebar"], [class*="p-ia4__sidebar"], [class*="sidebar_layout"], [class*="view_contents--sidebar"]',
       sidebarBg,
     ],
     [
