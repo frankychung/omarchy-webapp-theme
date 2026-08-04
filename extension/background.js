@@ -1,5 +1,27 @@
 const HOST = "com.omarchy.slack_theme";
-const SLACK_URL_PATTERNS = ["*://app.slack.com/*", "*://*.slack.com/*"];
+
+// Every site a pack supports, straight from the manifest's content-script
+// matches — adding a pack never touches this file.
+const MATCH_PATTERNS = [
+  ...new Set(chrome.runtime.getManifest().content_scripts.flatMap((cs) => cs.matches)),
+];
+// Bare hostnames for the cheap onUpdated filter ("*://*.slack.com/*" → slack.com).
+const MATCH_HOSTS = [
+  ...new Set(
+    MATCH_PATTERNS.map((p) =>
+      p.replace(/^\*:\/\//, "").replace(/\/.*$/, "").replace(/^\*\./, "")
+    )
+  ),
+];
+
+function isThemedUrl(url) {
+  try {
+    const host = new URL(url).hostname;
+    return MATCH_HOSTS.some((h) => host === h || host.endsWith("." + h));
+  } catch (_) {
+    return false;
+  }
+}
 
 let port = null;
 let reconnectTimer = null;
@@ -51,8 +73,8 @@ function scheduleReconnect() {
 }
 
 function broadcast(theme) {
-  chrome.tabs.query({ url: SLACK_URL_PATTERNS }, (tabs) => {
-    console.log("[omarchy] broadcasting theme to", tabs.length, "slack tab(s)");
+  chrome.tabs.query({ url: MATCH_PATTERNS }, (tabs) => {
+    console.log("[omarchy] broadcasting theme to", tabs.length, "themed tab(s)");
     for (const t of tabs) {
       chrome.tabs.sendMessage(t.id, { type: "omarchy-theme", theme }).catch(() => {});
     }
@@ -77,7 +99,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
 chrome.tabs.onUpdated.addListener((tabId, info, tab) => {
   if (info.status !== "complete") return;
-  if (!tab.url || !tab.url.includes("slack.com")) return;
+  if (!tab.url || !isThemedUrl(tab.url)) return;
   chrome.storage.local.get("theme").then(({ theme }) => {
     if (theme) chrome.tabs.sendMessage(tabId, { type: "omarchy-theme", theme }).catch(() => {});
   });

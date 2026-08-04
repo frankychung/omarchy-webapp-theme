@@ -21,6 +21,9 @@ Chromium with one flag change to `install.sh`.
 - **Pushes updates instantly** when you switch themes. A small
   native-messaging host hooks into omarchy's own `theme-set` event and pushes
   the new state to the extension the moment the theme lands.
+- **Not just Slack**: the extension is a theme engine plus one small "pack" per
+  site. A WhatsApp Web pack ships too (experimental), and adding another site
+  is one pack file + one manifest entry.
 
 https://github.com/user-attachments/assets/83787af6-7c41-4449-9460-c7f67b21aa5b
 
@@ -188,6 +191,7 @@ extension/
 ├── omarchy-surfaces.js             # engine: deriveSurfaces() -- theme -> surfaces
 ├── omarchy-runtime.js              # engine: OmarchyTheme registry + theme dispatch
 ├── content.js                      # the Slack pack: injects CSS + drives prefs automation
+├── whatsapp.js                     # the WhatsApp pack: declarative CSS-var table (experimental)
 └── inject-prefers-color-scheme.js  # MAIN-world: matchMedia polyfill + React-click bridge
 
 native-host/

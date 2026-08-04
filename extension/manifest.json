@@ -7,27 +7,47 @@
   "permissions": ["nativeMessaging", "storage"],
   "host_permissions": [
     "*://app.slack.com/*",
-    "*://*.slack.com/*"
+    "*://*.slack.com/*",
+    "*://web.whatsapp.com/*"
   ],
   "background": {
     "service_worker": "background.js"
   },
   "content_scripts": [
     {
-      "matches": ["*://app.slack.com/*", "*://*.slack.com/*"],
+      "matches": [
+        "*://app.slack.com/*",
+        "*://*.slack.com/*",
+        "*://web.whatsapp.com/*"
+      ],
       "js": ["inject-prefers-color-scheme.js"],
       "run_at": "document_start",
       "all_frames": false,
       "world": "MAIN"
     },
     {
-      "matches": ["*://app.slack.com/*", "*://*.slack.com/*"],
+      "matches": [
+        "*://app.slack.com/*",
+        "*://*.slack.com/*",
+        "*://web.whatsapp.com/*"
+      ],
       "js": [
         "omarchy-colors.js",
         "omarchy-surfaces.js",
-        "omarchy-runtime.js",
-        "content.js"
+        "omarchy-runtime.js"
       ],
+      "run_at": "document_start",
+      "all_frames": false
+    },
+    {
+      "matches": ["*://app.slack.com/*", "*://*.slack.com/*"],
+      "js": ["content.js"],
+      "run_at": "document_start",
+      "all_frames": false
+    },
+    {
+      "matches": ["*://web.whatsapp.com/*"],
+      "js": ["whatsapp.js"],
       "run_at": "document_start",
       "all_frames": false
     }

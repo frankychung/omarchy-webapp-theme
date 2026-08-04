@@ -128,6 +128,21 @@ json_value() {
   fi
 }
 
+# The whole colors.toml palette as one JSON object, keys sorted so the output
+# is deterministic. Key/value shapes are already constrained by the
+# parse_colors_toml regex ([A-Za-z0-9_]+ / "#hex"), but escape anyway.
+colors_json() {
+  local key first=1
+  printf '{'
+  while IFS= read -r key; do
+    [[ -n $key ]] || continue
+    ((first)) || printf ','
+    first=0
+    printf '"%s":"%s"' "$(json_escape "$key")" "$(json_escape "${COLORS[$key]}")"
+  done < <(printf '%s\n' "${!COLORS[@]}" | sort)
+  printf '}'
+}
+
 build_state() {
   local name bg fg accent selection chrome
 
@@ -144,14 +159,17 @@ build_state() {
   selection="${COLORS[selection_background]:-}"
 
   # No day/night flag by design — the extension decides dark vs. light purely
-  # from the WCAG relative luminance of bg.
-  printf '{"theme_name":%s,"bg":%s,"fg":%s,"accent":%s,"selection_bg":%s,"chrome":%s}' \
+  # from the WCAG relative luminance of bg. The named fields stay as the stable
+  # v1 contract; "colors" carries the theme's whole colors.toml palette so
+  # richer packs can map more than five values.
+  printf '{"theme_name":%s,"bg":%s,"fg":%s,"accent":%s,"selection_bg":%s,"chrome":%s,"colors":%s}' \
     "$(json_value "$name")" \
     "$(json_value "$bg")" \
     "$(json_value "$fg")" \
     "$(json_value "$accent")" \
     "$(json_value "$selection")" \
-    "$(json_value "$chrome")"
+    "$(json_value "$chrome")" \
+    "$(colors_json)"
 }
 
 # ------------------------------------------------------------------ framing --

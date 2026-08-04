@@ -1,12 +1,21 @@
 // Omarchy web-app theming — generic engine runtime (app-agnostic).
 //
 // Owns the theme channel to the native host (via background.js) and drives
-// whichever app pack registered itself with OmarchyTheme.register(). An app
-// pack provides:
-//   apply(theme, surfaces)      — paint the app (required)
-//   onColorMode(isDark, theme)  — flip the app's own light/dark mode (optional)
-// This file knows nothing about Slack (or any specific app); all app-specific
-// DOM work lives behind register().
+// whichever app pack registered itself with OmarchyTheme.register(). Only the
+// pack matching the current site ever loads (each pack's manifest
+// content_scripts entry matches just its own site), so one registry slot is
+// enough. An app pack provides any of:
+//   cssVars(theme, surfaces)    — declarative tier: return a map of the APP'S
+//                                 OWN CSS custom properties → values; the
+//                                 engine writes them inline-important on
+//                                 <html> and <body> on every theme apply.
+//                                 Enough by itself for apps that theme through
+//                                 CSS variables.
+//   apply(theme, surfaces)      — full tier: arbitrary painting (CSS
+//                                 injection, inline overrides, observers)
+//   onColorMode(isDark, theme)  — flip the app's own light/dark mode
+// This file knows nothing about any specific app; all app-specific DOM work
+// lives behind register().
 
 const OmarchyTheme = {
   _pack: null,
@@ -16,6 +25,15 @@ const OmarchyTheme = {
 
   register(pack) {
     this._pack = pack;
+    // Packs load in a separate content-script entry from the engine, so the
+    // initial theme (request-theme response, or even a live push) can land in
+    // the gap before the pack registers. When that happens apply() has already
+    // run pack-less and armed the de-dup key — replay the theme now so the
+    // pack always gets it.
+    if (this.current) {
+      this._lastKey = null;
+      this.apply(this.current.theme);
+    }
   },
 
   // Re-run the current theme, bypassing the de-dup guard. App packs call this
@@ -79,6 +97,28 @@ const OmarchyTheme = {
       });
     }
 
+    if (this._pack && this._pack.cssVars) {
+      // Define the vars with !important on EVERY element, not just the root.
+      // Apps commonly (re)define their theme tokens on a wrapper element below
+      // <html> (WhatsApp does), which would shadow a root-level value for the
+      // whole subtree that matters. An author-!important declaration on each
+      // element beats the app's non-important definitions wherever they live,
+      // with zero selector knowledge.
+      const vars = this._pack.cssVars(theme, surfaces);
+      let css = "html, html * {";
+      for (const [name, value] of Object.entries(vars || {})) {
+        if (value == null) continue;
+        css += `${name}: ${value} !important;`;
+      }
+      css += "}";
+      let style = document.getElementById("omarchy-webapp-vars");
+      if (!style) {
+        style = document.createElement("style");
+        style.id = "omarchy-webapp-vars";
+        (document.head || document.documentElement).appendChild(style);
+      }
+      style.textContent = css;
+    }
     if (this._pack && this._pack.apply) {
       this._pack.apply(theme, surfaces);
     }

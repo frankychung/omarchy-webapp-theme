@@ -4,11 +4,12 @@ Guidance for working in this repo. Keep it short; update it when the architectur
 
 ## What this is
 
-A small **Manifest V3 browser extension** (Brave/Chrome/Chromium) that makes the
-**Slack web app** (`app.slack.com`) follow the current [Omarchy](https://omarchy.org/)
-theme. It repaints Slack's chrome/sidebar/message pane to match the terminal
-background and auto-flips Slack's Light/Dark Color Mode when you switch omarchy
-themes. A **bash native-messaging host** reads the active Omarchy theme from
+A small **Manifest V3 browser extension** (Brave/Chrome/Chromium) that makes
+web apps follow the current [Omarchy](https://omarchy.org/) theme. One
+app-agnostic **engine** + one **pack per site**: Slack (`content.js`, the full
+pack — repaints chrome/sidebar/message pane and auto-flips Slack's Light/Dark
+Color Mode) and WhatsApp Web (`whatsapp.js`, a declarative pack — experimental).
+A **bash native-messaging host** reads the active Omarchy theme from
 `~/.local/state/omarchy/current/` and pushes theme changes to the extension the
 moment they land. **Requires Omarchy 4+.**
 
@@ -28,8 +29,16 @@ script.
     themed CSS from the derived surfaces and injects it; drives Slack's
     Preferences modal to flip Color Mode; registers via `OmarchyTheme.register()`.
     See "content.js structure" below.
+  - `whatsapp.js` — **the WhatsApp pack** (declarative tier): just a `cssVars`
+    table mapping WhatsApp's own CSS custom properties to the derived surfaces.
+    Every name verified against the live WhatsApp DOM (2026-08-04); the chat
+    list/header paint via the `--WDS-surface-*` semantic tokens, found by
+    resolving every custom property at the element and matching the painted
+    color. Requires WhatsApp's theme set to "System default".
   - `background.js` — MV3 service worker. Holds the native-messaging port,
-    rebroadcasts pushed themes to Slack tabs, answers `request-fresh-theme`.
+    rebroadcasts pushed themes to matched tabs (the site list is derived from
+    the manifest's content-script matches — adding a pack never touches this
+    file), answers `request-fresh-theme`.
   - `inject-prefers-color-scheme.js` — runs in the page's MAIN world at
     `document_start`; a near-complete `matchMedia('(prefers-color-scheme)')`
     polyfill so Slack's "Sync with OS" appearance follows omarchy, plus the
@@ -48,6 +57,29 @@ script.
   Chromium-family profile dirs, symlinks the hook into `hooks/theme-set.d/`, and
   adds `--load-extension` to the flags confs of installed browsers. `--no-flags`,
   `--uninstall`.
+
+## Adding a site pack
+
+The whole point of the engine/pack split. One extension, one pinned ID, one
+host manifest — a new site needs **no new keys and no native-messaging changes**:
+
+1. Create `extension/<site>.js` ending in `OmarchyTheme.register({...})`.
+   Start declarative: `cssVars(theme, s)` returning a map of the SITE'S OWN css
+   custom properties → derived surfaces (see `whatsapp.js`). Only escalate to
+   `apply()` + observers + `onColorMode()` if the site fights back (see
+   `content.js` — Slack is the worst case).
+2. In `manifest.json`: add the site's URL pattern to `host_permissions`, to the
+   two shared entries (shim + engine), and add a new content-script entry
+   loading just `<site>.js` for that pattern. Keep pack files flat in
+   `extension/` — the AUR PKGBUILD installs with a flat `extension/*` glob.
+3. `background.js` and `install.sh` need nothing; the site list is derived from
+   the manifest.
+4. Verify against the live site (see Dev / test workflow). Read variable/class
+   names off the live DOM — never guess.
+
+The host's payload carries the stable named fields (`bg`, `fg`, `accent`,
+`selection_bg`, `chrome`) plus `colors`: the theme's entire `colors.toml`
+palette, for packs that want to map more than five values.
 
 ## Host design (why it looks like this)
 
