@@ -9,7 +9,8 @@ web apps follow the current [Omarchy](https://omarchy.org/) theme. One
 app-agnostic **engine** + one **pack per site**: Slack (`content.js`, the full
 pack — repaints chrome/sidebar/message pane and auto-flips Slack's Light/Dark
 Color Mode), WhatsApp Web (`whatsapp.js`, declarative), GitHub (`github.js`,
-declarative Primer tokens), and Linear (`linear.js`, declarative). A **bash
+declarative Primer tokens), Linear (`linear.js`), Discord (`discord.js`), and
+Outlook Web (`outlook.js`, Fluent v9 tokens). A **bash
 native-messaging host** reads the active Omarchy theme from
 `~/.local/state/omarchy/current/` and pushes theme changes to the extension
 the moment they land. **Requires Omarchy 4+.**
