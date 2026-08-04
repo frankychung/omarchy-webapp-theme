@@ -1,0 +1,33 @@
+<!--
+  Source of truth for the extension icon. Regenerate the PNGs in extension/ with:
+    for s in 16 32 48 128; do rsvg-convert -w $s -h $s icon.svg -o extension/icon-$s.png; done
+
+  A browser pane wearing three palette swatches — the extension in one glyph.
+  Drawn from scratch: it deliberately shares no geometry with the Omarchy logo,
+  whose MIT license covers Omarchy's code and not its branding, and which would
+  imply this is an official Omarchy project.
+
+  Follows the convention of omarchy's own bundled chromium extensions
+  (copy-url, yt-dlp): monochrome #9ECE6A line art on a transparent ground, no
+  plate. Two consequences of that choice, both accepted deliberately:
+
+    * #9ECE6A is 8.3:1 on dark browser chrome but only 1.6:1 on light, so the
+      icon is quiet on a light omarchy theme. Omarchy is dark-first and matching
+      its bundled extensions was the priority.
+    * Monochrome means the three swatches separate by VALUE, not hue, and value
+      differences survive downscaling far worse than hue differences. Hence the
+      deliberately wide ramp below (near-white / omarchy green / deep green): a
+      narrower ramp merged into a single green block at 16px.
+
+  Sized for the 16px toolbar first, since that is where an icon either works or
+  turns to mush: edges sit on multiples of 8 so they land on whole pixels at 1/8
+  scale, the frame is heavy enough to survive the shrink, and the title bar is a
+  strip rather than dots because dots vanish entirely at that size.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <rect x="16" y="24" width="96" height="80" rx="12" fill="none" stroke="#9ECE6A" stroke-width="10"/>
+  <path d="M20 46 H108" stroke="#9ECE6A" stroke-width="7"/>
+  <rect x="24" y="56" width="24" height="40" rx="3" fill="#E8F5D8"/>
+  <rect x="52" y="56" width="24" height="40" rx="3" fill="#9ECE6A"/>
+  <rect x="80" y="56" width="24" height="40" rx="3" fill="#4A7226"/>
+</svg>

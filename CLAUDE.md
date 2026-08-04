@@ -92,6 +92,21 @@ script.
     on every machine, so the host manifest's `allowed_origins` can be hardcoded.
     Never regenerate it — the ID is baked into the host manifest template and
     into users' installed copies.
+  - `icon-{16,32,48,128}.png` — the extension icon, wired into both `icons` and
+    `action.default_icon`. Rasterized from `icon.svg`; don't hand-edit.
+- `icon.svg` — source of truth for the icon (regen command is in its comment).
+  Drawn from scratch, deliberately sharing nothing with the **Omarchy mark** —
+  Omarchy's MIT license covers its code, not its branding, and reusing the logo
+  would imply this is an official Omarchy project. Instead it follows the
+  *convention* of omarchy's bundled chromium extensions (`copy-url`, `yt-dlp`):
+  **monochrome `#9ECE6A` line art on a transparent ground**, no plate. Known
+  trade-off, accepted for that consistency: `#9ECE6A` is 8.3:1 on dark browser
+  chrome but 1.6:1 on light, so the icon is quiet on a light omarchy theme.
+  Tuned for the 16px toolbar first: edges on multiples of 8 so they land on whole
+  pixels at 1/8 scale, a title *strip* rather than dots (dots disappear entirely
+  at that size), and a deliberately **wide** light→dark swatch ramp, because
+  monochrome separates by value and value survives downscaling much worse than
+  hue — a narrow ramp merged into one green block at 16px.
 - `native-host/` — `omarchy-webapp-theme-host` (bash; emits length-prefixed JSON
   over stdio) + the native-messaging manifest template.
 - `hooks/omarchy-webapp-theme` — omarchy `theme-set` hook. Signals SIGUSR1 to

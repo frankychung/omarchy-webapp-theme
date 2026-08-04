@@ -2,6 +2,12 @@
   "manifest_version": 3,
   "name": "Omarchy Web App Theme",
   "version": "0.3.0",
+  "icons": {
+    "16": "icon-16.png",
+    "32": "icon-32.png",
+    "48": "icon-48.png",
+    "128": "icon-128.png"
+  },
   "description": "Make web apps (Slack, WhatsApp, ...) follow the current Omarchy theme: palette, light/dark, and accent.",
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEArJSIwQv/78rvsaA9dVcTZe+lO4JPxjYFOazJiLCsGt7Rp4L6fQy7G6Wllteg/ueE2qWO7NDs0wmNkchE0xjqsPU3BQCzzNM6hevscKdZ0k8QXbEr4L+C+jwC/VPkD73soaKQncnDWtGsA9VLVIom6wWkr0qcop7QNE1+wXdx/n7b/5v192/STiunFMuUNLpEiYzWMwQZtydVtRms1jJvSHE7C9ye9QT6z/dTYJs9LeyREI5HNxzhUMIeWlh44QS6jlf40jnsTJvXJ6FJedQ3C0FhD9i6Tw7+/+XgtU64dQJ2RahP8SpsfHD6TTh4Tfnnw1D6zjjaPyi8pn1DY7nHiQIDAQAB",
   "permissions": [
@@ -139,6 +145,12 @@
     "open_in_tab": false
   },
   "action": {
-    "default_title": "Omarchy Web App Theme"
+    "default_title": "Omarchy Web App Theme",
+    "default_icon": {
+      "16": "icon-16.png",
+      "32": "icon-32.png",
+      "48": "icon-48.png",
+      "128": "icon-128.png"
+    }
   }
 }
