@@ -47,13 +47,93 @@ function applySlackTheme(theme, s) {
       --rainbow-mention-badge: ${accent} !important;
       --rainbow-mention-text: ${railBg} !important;
 
-      /* SK / SAF design tokens */
-      --sk_primary_background: ${theme.bg} !important;
-      --sk_primary_foreground: ${fg} !important;
-      --sk_secondary_background: ${sidebarBg} !important;
-      --sk_foreground_high: ${fg} !important;
-      --sk_foreground_max: ${fg} !important;
-      --sk_highlight: ${accent} !important;
+      /* ===== SK design tokens — TRIPLETS, not colors =====
+         Slack holds these as bare "r, g, b" channel lists and composites at the
+         point of use: color: rgba(var(--sk_primary_foreground), .7). We used to
+         write hex here, which built rgba(#a9b1d6, .7) — invalid at
+         computed-value time, so the declaration was dropped and color unwound
+         through identically-broken ancestors to the UA default: white under
+         color-scheme:dark, black under light. Message body text was never the
+         theme's fg at all; it just happened to be legible on dark themes. Two
+         verified counts, from auditing every consumer in Slack's stylesheets:
+         --sk_primary_foreground is wrapped in rgb()/rgba() 690 times vs 38 bare,
+         --sk_foreground_max 904 vs 2. Triplets it is. The few bare consumers
+         (color: var(--sk_primary_foreground) on a popover header, an avatar
+         initial) now inherit the correct themed color instead, which is right;
+         the handful of bare background-color ones fall back to transparent,
+         which reads acceptably on an already-themed surface.
+         Use toTriplet() on everything here — a hex in this block is a silent
+         regression, not a visible one. */
+      --sk_primary_background: ${toTriplet(theme.bg)} !important;
+      --sk_primary_foreground: ${toTriplet(fg)} !important;
+      --sk_secondary_background: ${toTriplet(sidebarBg)} !important;
+      --sk_highlight: ${toTriplet(accent)} !important;
+      --sk_highlight_hover: ${toTriplet(accent)} !important;
+      --sk_highlight_accent: ${toTriplet(accent)} !important;
+      /* Inverted pair: ink on an accent/emphasis fill, so it's the background
+         colour, and vice versa. Slack's dark values are literally its own
+         bg/fg swapped. */
+      --sk_inverted_foreground: ${toTriplet(theme.bg)} !important;
+      --sk_inverted_background: ${toTriplet(fg)} !important;
+
+      /* The emphasis ladder. Non-solid tokens are the raw ink — consumers supply
+         the alpha, e.g. rgba(var(--sk_foreground_high), .5), so all of them are
+         just fg. */
+      --sk_foreground_max: ${toTriplet(fg)} !important;
+      --sk_foreground_high: ${toTriplet(fg)} !important;
+      --sk_foreground_mid: ${toTriplet(fg)} !important;
+      --sk_foreground_low: ${toTriplet(fg)} !important;
+      --sk_foreground_min: ${toTriplet(fg)} !important;
+      --sk_foreground_soft: ${toTriplet(fg)} !important;
+
+      /* ...and their _solid twins, which are the SAME ink already flattened onto
+         the canvas, consumed at alpha 1. Slack bakes them against its own
+         #1a1d21: its shipped values solve back to exactly that background at
+         these alphas (171,171,173 = 70%, 129,131,133 = 50%, 53,55,59 = 13%),
+         which is how the ladder below was recovered. Because they're opaque
+         literals carrying a hardcoded background, leaving them alone paints
+         Slack's canvas into our text — barely visible on a dark theme whose bg
+         is near Slack's, and near-black-on-near-white on any light theme.
+         Re-composite them against OUR bg instead. */
+      --sk_foreground_max_solid: ${toTriplet(mix(theme.bg, fg, 0.7))} !important;
+      --sk_foreground_high_solid: ${toTriplet(mix(theme.bg, fg, 0.5))} !important;
+      --sk_foreground_mid_solid: ${toTriplet(mix(theme.bg, fg, 0.27))} !important;
+      --sk_foreground_low_solid: ${toTriplet(mix(theme.bg, fg, 0.13))} !important;
+      --sk_foreground_soft_solid: ${toTriplet(mix(theme.bg, fg, 0.05))} !important;
+      --sk_foreground_min_solid: ${toTriplet(mix(theme.bg, fg, 0.04))} !important;
+
+      /* ===== dt_color design tokens — REAL COLORS, not triplets =====
+         Slack is mid-migration to a second token system, --dt_color-*, and it
+         drives the surfaces the SK tokens no longer do: sender names read
+         var(--dt_color-content-pry), links and @mention slugs read
+         var(--dt_color-content-hgl-1). That's why a thread pane came out
+         part-themed — body text obeyed us while names stayed Slack's #f8f8f8
+         and mentions stayed Slack's #1264a3 cyan.
+         Opposite format rule from the block above: these are consumed BARE
+         (color: var(--dt_color-content-pry)), so they hold actual colors. A
+         triplet here breaks them exactly the way hex broke the SK tokens.
+         Format per token is a contract — verify, don't pattern-match.
+         Only the foreground and outline families are mapped. The base- and
+         surf- background tokens (--dt_color-base-pry alone is ~1100
+         background-color declarations) are deliberately left to the explicit
+         pane rules further down, which already own those surfaces; remapping
+         both would double-tint them. */
+      --dt_color-content-pry: ${fgStrong} !important;
+      --dt_color-content-sec: ${fg} !important;
+      --dt_color-content-ter: ${withAlpha(fg, 0.7)} !important;
+      --dt_color-content-hgl-1: ${accent} !important;
+      --dt_color-content-hgl-2: ${accent} !important;
+      /* Ink for text sitting on an inverted/emphasis fill — that fill is the
+         accent or the fg, so the readable ink there is the background. */
+      --dt_color-content-inv-pry: ${theme.bg} !important;
+      /* Focus ring + hairline. Slack ships otl-hgl-1 as its brand blue and
+         otl-ter as an alpha-hex (#5e5d6021); keep the alpha shape. */
+      --dt_color-otl-hgl-1: ${accent} !important;
+      --dt_color-otl-ter: ${borderColor} !important;
+      /* NOT mapped, on purpose: --dt_color-constants-white / -black are literal
+         colors (icon fills, ink on brand buttons), and --dt_color-content-imp is
+         the error red. Repointing literals inverts contrast — the same lesson the
+         Outlook pack records for --white/--black. */
       --saf-0: ${theme.bg} !important;
       --saf-1: ${sidebarBg} !important;
       --saf-2: ${railBg} !important;
@@ -221,6 +301,19 @@ function applySlackTheme(theme, s) {
     html body [role="menu"],
     html body [class*="ReactModal__Content"] {
       background-color: var(--omarchy-bg) !important;
+    }
+
+    /* ...except a tooltip, which Slack renders inside a ReactModal carrying
+       role="dialog" — so the rule above matched it twice and painted an opaque
+       theme-bg rectangle behind the bubble. The wrapper is ~8px taller than the
+       tip, so it showed as a dark slab spilling out below the rounded corners
+       (measured: wrapper 328→438, bubble 328→430). The tooltip paints its own
+       surface; its wrapper must not paint anything. :has() takes the specificity
+       of its argument, so this outranks the rule above without having to weaken
+       it for real dialogs. */
+    html body [role="dialog"]:has([class*="c-tooltip__tip"]),
+    html body [class*="ReactModal__Content"]:has([class*="c-tooltip__tip"]) {
+      background-color: transparent !important;
     }
 
     /* Make every container inside the channel sidebar transparent so the
@@ -458,8 +551,16 @@ function applySlackTheme(theme, s) {
     /* Reaction chips. Slack fills them with its own near-black 6% wash and dark
        ink, and paints the "you reacted" state pale blue with blue text — none of
        it theme-aware, so on light themes they read as washed-out pills floating
-       on the message. Derive all three from the theme instead. */
-    html body [class*="c-reaction"]:not([class*="c-reaction_bar"]) {
+       on the message. Derive all three from the theme instead.
+
+       The __tip exclusion is load-bearing. The hover tooltip's internals are
+       ALSO named c-reaction (c-reaction__tip, __tip--emoji_wrapper,
+       __tip--emoji), so a bare [class*="c-reaction"] matched three nested
+       elements inside it and stacked this wash three times over — the tooltip
+       came out as a set of mismatched grey bands with the emoji sitting in the
+       lightest one. Same over-broad-substring trap as view_contents and
+       tab_rail: match the chip, not everything sharing its prefix. */
+    html body [class*="c-reaction"]:not([class*="c-reaction_bar"]):not([class*="__tip"]) {
       background-color: ${withAlpha(fg, 0.07)} !important;
       color: var(--omarchy-fg) !important;
       border-color: var(--omarchy-border) !important;
@@ -472,6 +573,50 @@ function applySlackTheme(theme, s) {
     }
     html body [class*="c-reaction__count"] {
       color: inherit !important;
+    }
+
+    /* ===== tooltips =====
+       Slack builds every tooltip off ONE local variable: .c-tooltip__tip sets
+       --background (to --dt_color-base-inv-pry, a neutral near-black), and both
+       the bubble and its arrow — a real child element, .c-tooltip__tip__arrow,
+       not a pseudo — read var(--background). So redefining that single variable
+       on the tip re-colours the bubble and the arrow together, and none of the
+       eight direction variants (--top, --bottom-left, …) need naming. */
+    html body [class*="c-tooltip__tip"] {
+      /* An elevated surface of its own, NOT --omarchy-nav-bg. A tooltip has to
+         read as floating above whatever it covers, and nav-bg lands within a few
+         points of the hovered message row (hover is a 20% accent wash over the
+         page: rgb(45,54,80) against nav-bg's rgb(45,50,68) on tokyo-night), so
+         the bubble dissolved into the row underneath it. Mixing toward the
+         foreground instead lifts it clear on dark themes and darkens it on light
+         ones, with no polarity special-casing.
+         Text is fg-strong rather than fg: on the lifted surface plain fg
+         measures 4.27:1, just under AA; fg-strong gives 5.98:1 dark and 6.89:1
+         light. */
+      --background: ${mix(theme.bg, fg, 0.3)} !important;
+      color: var(--omarchy-fg-strong) !important;
+      border-color: var(--omarchy-border) !important;
+      /* Slack outlines the tip with filter: drop-shadow(0 0 1px
+         var(--dt_color-otl-pry)), an unmapped #797c81 grey. A drop-shadow traces
+         the element's ALPHA SILHOUETTE, so it rings the bubble AND the arrow —
+         which reads as a pale rim spilling past the rounded corners rather than
+         as a border. Re-point it at the theme hairline; the tooltip already
+         separates from the page by sitting on the nav surface. */
+      filter: drop-shadow(0 0 1px var(--omarchy-border)) !important;
+    }
+
+    /* The emoji preview inside a reaction tooltip is deliberately matted on
+       WHITE by Slack (--dt_color-brand-core-white, and a literal #fff on the
+       emoji-picker variant) so emoji look consistent on their light canvas. On a
+       dark theme that is a white postage stamp punched into the tooltip. Emoji
+       PNGs are transparent and read fine unmatted — the inline chips already
+       prove it — so drop the plate rather than repointing the brand-white
+       literal, which is a constant that other things rely on. */
+    html body [class*="c-reaction__tip--emoji"] [class*="c-emoji__large"],
+    html body [class*="c-reaction__tip--emoji"] [class*="c-emoji__larger"],
+    html body [class*="c-emoji__emoji-tooltip"] [class*="c-emoji__large"],
+    html body [class*="c-emoji__emoji-tooltip"] [class*="c-emoji__larger"] {
+      background-color: transparent !important;
     }
 
     /* "Jump to first unread" / "N new messages" floating pill at the top of

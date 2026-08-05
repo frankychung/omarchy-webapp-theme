@@ -34,7 +34,21 @@ function deriveSurfaces(theme) {
   const railBg = chromeBg;
   const navBg = chromeBg;
   const sidebarFg = fg;
-  const sidebarMuted = withAlpha(fg, 0.65);
+  // Muted/secondary text. Stays an rgba() ink rather than an opaque mix so it
+  // keeps adapting to whatever surface it lands on — but the alpha is solved for
+  // a contrast TARGET instead of being a flat fraction of fg. Packs spend this on
+  // real copy (GitHub's --fgColor-muted carries issue metadata and mega-menu
+  // descriptions), and a flat 0.65 put 5 of 22 shipped themes under the AA
+  // 4.5:1 floor. Target 6:1, matching GitHub's own dark muted (6.15:1).
+  //
+  // Solved against the PAGE bg only, deliberately. Also requiring 6:1 on the
+  // accent-tinted sidebarBg pushes the alpha to 1.0 on low-headroom themes
+  // (rose-pine, catppuccin-latte, everforest, tokyo-night, gruvbox), which
+  // collapses muted onto fg and destroys the muted/primary distinction entirely.
+  // Solving against bg keeps every theme's muted distinguishable, lands 6.0-6.2:1
+  // where the copy actually lives, and still leaves the sidebar above the AA
+  // floor (worst case 4.53:1).
+  const sidebarMuted = withAlpha(fg, alphaForContrast(fg, [theme.bg], 6));
   // Stronger than fg: push toward white on dark themes / black on light themes.
   // Used for unread rows so they read brighter than read rows.
   const fgStrong = shade(fg, dir * 0.125);
