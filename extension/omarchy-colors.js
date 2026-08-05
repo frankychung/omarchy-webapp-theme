@@ -56,6 +56,44 @@ function withAlpha(hex, alpha) {
   return `rgba(${c.r}, ${c.g}, ${c.b}, ${alpha})`;
 }
 
+// WCAG contrast ratio between two colors. Both are composited/opaque by the
+// time they get here — pass the surface a translucent ink will actually sit on,
+// not the ink's rgba() string.
+function contrastRatio(colorA, colorB) {
+  const a = hexToRgb(colorA);
+  const b = hexToRgb(colorB);
+  if (!a || !b) return 1;
+  const la = relLuminance(a);
+  const lb = relLuminance(b);
+  const hi = Math.max(la, lb);
+  const lo = Math.min(la, lb);
+  return (hi + 0.05) / (lo + 0.05);
+}
+
+// Pick the lowest alpha at which `ink` over EVERY surface in `surfaces` clears
+// `target` contrast. Muted text is a fixed fraction of the foreground in most
+// theming systems, but a fixed fraction ignores how much contrast the theme's fg
+// had to begin with: at the old flat 0.65, 5 of the 22 shipped omarchy themes put
+// muted text below the WCAG AA 4.5:1 floor (rose-pine was worst at 3.00:1), and
+// GitHub spends --fgColor-muted on real copy — issue metadata, mega-menu
+// descriptions — not just incidental labels.
+//
+// Contrast is monotonic in alpha (compositing walks the colour from the surface
+// toward the ink, and luminance is monotonic in the channels), so a rising scan
+// finds the minimum. Returns 1 when even the opaque foreground can't reach the
+// target — on a low-headroom theme that means muted lands on fg and the
+// muted/primary distinction flattens, which is the accepted cost of the target.
+function alphaForContrast(ink, surfaces, target, floorAlpha) {
+  const floor = floorAlpha == null ? 0.65 : floorAlpha;
+  const list = (Array.isArray(surfaces) ? surfaces : [surfaces]).filter(Boolean);
+  if (!list.length) return floor;
+  for (let a = floor; a < 1; a += 0.01) {
+    const ok = list.every((surface) => contrastRatio(mix(surface, ink, a), surface) >= target);
+    if (ok) return Math.round(a * 100) / 100;
+  }
+  return 1;
+}
+
 // Emit "r, g, b" — a bare channel list, NOT a color. Some design systems (see
 // Slack's --sk_* tokens) hold their palette as triplets and composite at the
 // point of use: `color: rgba(var(--sk_primary_foreground), .7)`. Feeding a real

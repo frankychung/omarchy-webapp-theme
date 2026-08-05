@@ -24,10 +24,16 @@ script.
 - `extension/` — the unpacked extension
   - `omarchy-colors.js` / `omarchy-surfaces.js` / `omarchy-runtime.js` — the
     app-agnostic engine (loaded before `content.js`, shares its scope): color
-    helpers (`relLuminance` linearizes channels per WCAG, `toTriplet` for
-    triplet-valued design tokens), `deriveSurfaces()` (the theme→surfaces
-    contract), and the `OmarchyTheme` registry that receives themes and
-    dispatches to the registered pack.
+    helpers (`relLuminance` linearizes channels per WCAG, `contrastRatio`,
+    `alphaForContrast`, `toTriplet` for triplet-valued design tokens),
+    `deriveSurfaces()` (the theme→surfaces contract), and the `OmarchyTheme`
+    registry that receives themes and dispatches to the registered pack.
+    `sidebarMuted` is **contrast-targeted, not a fixed fraction of `fg`**: its
+    alpha is solved per theme so muted copy clears 6:1 against the page bg
+    (matching GitHub's own dark muted at 6.15:1). A flat 0.65 put 5 of the 22
+    shipped themes below the AA 4.5:1 floor — rose-pine worst at 3.00:1 — and
+    packs spend this level on real copy, not incidental labels. It stays an
+    `rgba()` ink so it keeps adapting to the surface it lands on.
   - `content.js` — **the Slack pack**, and the bulk of the work. Builds the
     themed CSS from the derived surfaces and injects it; drives Slack's
     Preferences modal to flip Color Mode; registers via `OmarchyTheme.register()`.
