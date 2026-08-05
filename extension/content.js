@@ -493,6 +493,13 @@ function applySlackTheme(theme, s) {
       --background: var(--omarchy-nav-bg) !important;
       color: var(--omarchy-fg) !important;
       border-color: var(--omarchy-border) !important;
+      /* Slack outlines the tip with filter: drop-shadow(0 0 1px
+         var(--dt_color-otl-pry)), an unmapped #797c81 grey. A drop-shadow traces
+         the element's ALPHA SILHOUETTE, so it rings the bubble AND the arrow —
+         which reads as a pale rim spilling past the rounded corners rather than
+         as a border. Re-point it at the theme hairline; the tooltip already
+         separates from the page by sitting on the nav surface. */
+      filter: drop-shadow(0 0 1px var(--omarchy-border)) !important;
     }
 
     /* The emoji preview inside a reaction tooltip is deliberately matted on
