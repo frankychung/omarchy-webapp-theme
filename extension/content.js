@@ -458,8 +458,16 @@ function applySlackTheme(theme, s) {
     /* Reaction chips. Slack fills them with its own near-black 6% wash and dark
        ink, and paints the "you reacted" state pale blue with blue text — none of
        it theme-aware, so on light themes they read as washed-out pills floating
-       on the message. Derive all three from the theme instead. */
-    html body [class*="c-reaction"]:not([class*="c-reaction_bar"]) {
+       on the message. Derive all three from the theme instead.
+
+       The __tip exclusion is load-bearing. The hover tooltip's internals are
+       ALSO named c-reaction (c-reaction__tip, __tip--emoji_wrapper,
+       __tip--emoji), so a bare [class*="c-reaction"] matched three nested
+       elements inside it and stacked this wash three times over — the tooltip
+       came out as a set of mismatched grey bands with the emoji sitting in the
+       lightest one. Same over-broad-substring trap as view_contents and
+       tab_rail: match the chip, not everything sharing its prefix. */
+    html body [class*="c-reaction"]:not([class*="c-reaction_bar"]):not([class*="__tip"]) {
       background-color: ${withAlpha(fg, 0.07)} !important;
       color: var(--omarchy-fg) !important;
       border-color: var(--omarchy-border) !important;
@@ -472,6 +480,33 @@ function applySlackTheme(theme, s) {
     }
     html body [class*="c-reaction__count"] {
       color: inherit !important;
+    }
+
+    /* ===== tooltips =====
+       Slack builds every tooltip off ONE local variable: .c-tooltip__tip sets
+       --background (to --dt_color-base-inv-pry, a neutral near-black), and both
+       the bubble and its arrow — a real child element, .c-tooltip__tip__arrow,
+       not a pseudo — read var(--background). So redefining that single variable
+       on the tip re-colours the bubble and the arrow together, and none of the
+       eight direction variants (--top, --bottom-left, …) need naming. */
+    html body [class*="c-tooltip__tip"] {
+      --background: var(--omarchy-nav-bg) !important;
+      color: var(--omarchy-fg) !important;
+      border-color: var(--omarchy-border) !important;
+    }
+
+    /* The emoji preview inside a reaction tooltip is deliberately matted on
+       WHITE by Slack (--dt_color-brand-core-white, and a literal #fff on the
+       emoji-picker variant) so emoji look consistent on their light canvas. On a
+       dark theme that is a white postage stamp punched into the tooltip. Emoji
+       PNGs are transparent and read fine unmatted — the inline chips already
+       prove it — so drop the plate rather than repointing the brand-white
+       literal, which is a constant that other things rely on. */
+    html body [class*="c-reaction__tip--emoji"] [class*="c-emoji__large"],
+    html body [class*="c-reaction__tip--emoji"] [class*="c-emoji__larger"],
+    html body [class*="c-emoji__emoji-tooltip"] [class*="c-emoji__large"],
+    html body [class*="c-emoji__emoji-tooltip"] [class*="c-emoji__larger"] {
+      background-color: transparent !important;
     }
 
     /* "Jump to first unread" / "N new messages" floating pill at the top of
