@@ -223,6 +223,19 @@ function applySlackTheme(theme, s) {
       background-color: var(--omarchy-bg) !important;
     }
 
+    /* ...except a tooltip, which Slack renders inside a ReactModal carrying
+       role="dialog" — so the rule above matched it twice and painted an opaque
+       theme-bg rectangle behind the bubble. The wrapper is ~8px taller than the
+       tip, so it showed as a dark slab spilling out below the rounded corners
+       (measured: wrapper 328→438, bubble 328→430). The tooltip paints its own
+       surface; its wrapper must not paint anything. :has() takes the specificity
+       of its argument, so this outranks the rule above without having to weaken
+       it for real dialogs. */
+    html body [role="dialog"]:has([class*="c-tooltip__tip"]),
+    html body [class*="ReactModal__Content"]:has([class*="c-tooltip__tip"]) {
+      background-color: transparent !important;
+    }
+
     /* Make every container inside the channel sidebar transparent so the
        sidebar's solid bg color shows edge-to-edge top to bottom. Section
        containers (Unreads/Threads/…, Starred, DMs, Channels), per-item
