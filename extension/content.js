@@ -303,6 +303,19 @@ function applySlackTheme(theme, s) {
       background-color: var(--omarchy-bg) !important;
     }
 
+    /* ...except a tooltip, which Slack renders inside a ReactModal carrying
+       role="dialog" — so the rule above matched it twice and painted an opaque
+       theme-bg rectangle behind the bubble. The wrapper is ~8px taller than the
+       tip, so it showed as a dark slab spilling out below the rounded corners
+       (measured: wrapper 328→438, bubble 328→430). The tooltip paints its own
+       surface; its wrapper must not paint anything. :has() takes the specificity
+       of its argument, so this outranks the rule above without having to weaken
+       it for real dialogs. */
+    html body [role="dialog"]:has([class*="c-tooltip__tip"]),
+    html body [class*="ReactModal__Content"]:has([class*="c-tooltip__tip"]) {
+      background-color: transparent !important;
+    }
+
     /* Make every container inside the channel sidebar transparent so the
        sidebar's solid bg color shows edge-to-edge top to bottom. Section
        containers (Unreads/Threads/…, Starred, DMs, Channels), per-item
@@ -538,8 +551,16 @@ function applySlackTheme(theme, s) {
     /* Reaction chips. Slack fills them with its own near-black 6% wash and dark
        ink, and paints the "you reacted" state pale blue with blue text — none of
        it theme-aware, so on light themes they read as washed-out pills floating
-       on the message. Derive all three from the theme instead. */
-    html body [class*="c-reaction"]:not([class*="c-reaction_bar"]) {
+       on the message. Derive all three from the theme instead.
+
+       The __tip exclusion is load-bearing. The hover tooltip's internals are
+       ALSO named c-reaction (c-reaction__tip, __tip--emoji_wrapper,
+       __tip--emoji), so a bare [class*="c-reaction"] matched three nested
+       elements inside it and stacked this wash three times over — the tooltip
+       came out as a set of mismatched grey bands with the emoji sitting in the
+       lightest one. Same over-broad-substring trap as view_contents and
+       tab_rail: match the chip, not everything sharing its prefix. */
+    html body [class*="c-reaction"]:not([class*="c-reaction_bar"]):not([class*="__tip"]) {
       background-color: ${withAlpha(fg, 0.07)} !important;
       color: var(--omarchy-fg) !important;
       border-color: var(--omarchy-border) !important;
@@ -552,6 +573,50 @@ function applySlackTheme(theme, s) {
     }
     html body [class*="c-reaction__count"] {
       color: inherit !important;
+    }
+
+    /* ===== tooltips =====
+       Slack builds every tooltip off ONE local variable: .c-tooltip__tip sets
+       --background (to --dt_color-base-inv-pry, a neutral near-black), and both
+       the bubble and its arrow — a real child element, .c-tooltip__tip__arrow,
+       not a pseudo — read var(--background). So redefining that single variable
+       on the tip re-colours the bubble and the arrow together, and none of the
+       eight direction variants (--top, --bottom-left, …) need naming. */
+    html body [class*="c-tooltip__tip"] {
+      /* An elevated surface of its own, NOT --omarchy-nav-bg. A tooltip has to
+         read as floating above whatever it covers, and nav-bg lands within a few
+         points of the hovered message row (hover is a 20% accent wash over the
+         page: rgb(45,54,80) against nav-bg's rgb(45,50,68) on tokyo-night), so
+         the bubble dissolved into the row underneath it. Mixing toward the
+         foreground instead lifts it clear on dark themes and darkens it on light
+         ones, with no polarity special-casing.
+         Text is fg-strong rather than fg: on the lifted surface plain fg
+         measures 4.27:1, just under AA; fg-strong gives 5.98:1 dark and 6.89:1
+         light. */
+      --background: ${mix(theme.bg, fg, 0.3)} !important;
+      color: var(--omarchy-fg-strong) !important;
+      border-color: var(--omarchy-border) !important;
+      /* Slack outlines the tip with filter: drop-shadow(0 0 1px
+         var(--dt_color-otl-pry)), an unmapped #797c81 grey. A drop-shadow traces
+         the element's ALPHA SILHOUETTE, so it rings the bubble AND the arrow —
+         which reads as a pale rim spilling past the rounded corners rather than
+         as a border. Re-point it at the theme hairline; the tooltip already
+         separates from the page by sitting on the nav surface. */
+      filter: drop-shadow(0 0 1px var(--omarchy-border)) !important;
+    }
+
+    /* The emoji preview inside a reaction tooltip is deliberately matted on
+       WHITE by Slack (--dt_color-brand-core-white, and a literal #fff on the
+       emoji-picker variant) so emoji look consistent on their light canvas. On a
+       dark theme that is a white postage stamp punched into the tooltip. Emoji
+       PNGs are transparent and read fine unmatted — the inline chips already
+       prove it — so drop the plate rather than repointing the brand-white
+       literal, which is a constant that other things rely on. */
+    html body [class*="c-reaction__tip--emoji"] [class*="c-emoji__large"],
+    html body [class*="c-reaction__tip--emoji"] [class*="c-emoji__larger"],
+    html body [class*="c-emoji__emoji-tooltip"] [class*="c-emoji__large"],
+    html body [class*="c-emoji__emoji-tooltip"] [class*="c-emoji__larger"] {
+      background-color: transparent !important;
     }
 
     /* "Jump to first unread" / "N new messages" floating pill at the top of
