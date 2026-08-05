@@ -503,8 +503,18 @@ function applySlackTheme(theme, s) {
        on the tip re-colours the bubble and the arrow together, and none of the
        eight direction variants (--top, --bottom-left, …) need naming. */
     html body [class*="c-tooltip__tip"] {
-      --background: var(--omarchy-nav-bg) !important;
-      color: var(--omarchy-fg) !important;
+      /* An elevated surface of its own, NOT --omarchy-nav-bg. A tooltip has to
+         read as floating above whatever it covers, and nav-bg lands within a few
+         points of the hovered message row (hover is a 20% accent wash over the
+         page: rgb(45,54,80) against nav-bg's rgb(45,50,68) on tokyo-night), so
+         the bubble dissolved into the row underneath it. Mixing toward the
+         foreground instead lifts it clear on dark themes and darkens it on light
+         ones, with no polarity special-casing.
+         Text is fg-strong rather than fg: on the lifted surface plain fg
+         measures 4.27:1, just under AA; fg-strong gives 5.98:1 dark and 6.89:1
+         light. */
+      --background: ${mix(theme.bg, fg, 0.3)} !important;
+      color: var(--omarchy-fg-strong) !important;
       border-color: var(--omarchy-border) !important;
       /* Slack outlines the tip with filter: drop-shadow(0 0 1px
          var(--dt_color-otl-pry)), an unmapped #797c81 grey. A drop-shadow traces
