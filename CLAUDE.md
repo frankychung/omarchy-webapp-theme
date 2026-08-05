@@ -24,9 +24,10 @@ script.
 - `extension/` — the unpacked extension
   - `omarchy-colors.js` / `omarchy-surfaces.js` / `omarchy-runtime.js` — the
     app-agnostic engine (loaded before `content.js`, shares its scope): color
-    helpers (`relLuminance` linearizes channels per WCAG), `deriveSurfaces()`
-    (the theme→surfaces contract), and the `OmarchyTheme` registry that receives
-    themes and dispatches to the registered pack.
+    helpers (`relLuminance` linearizes channels per WCAG, `toTriplet` for
+    triplet-valued design tokens), `deriveSurfaces()` (the theme→surfaces
+    contract), and the `OmarchyTheme` registry that receives themes and
+    dispatches to the registered pack.
   - `content.js` — **the Slack pack**, and the bulk of the work. Builds the
     themed CSS from the derived surfaces and injects it; drives Slack's
     Preferences modal to flip Color Mode; registers via `OmarchyTheme.register()`.
@@ -174,16 +175,35 @@ removes the need entirely. Consequences to preserve when editing:
    **Destructure every field the CSS/`directPaint` uses — a missing one is a
    silent runtime ReferenceError** (this bit us with `chromeBg`). Then it builds
    one big CSS template string and injects it into a `<style id="omarchy-slack-style">`.
-3. **Inline-important overrides** — Slack sets its own high-specificity inline
+3. **Three token systems, three different rules.** Slack is mid-migration, so the
+   same pane is painted by three families and each needs a different treatment:
+   - `--sk_*` — held as bare **`r, g, b` triplets** and composited at the point of
+     use (`rgba(var(--sk_primary_foreground), .7)`). Write triplets via
+     `toTriplet()`.
+   - `--sk_*_solid` — the same ink **pre-composited against Slack's own
+     `#1a1d21`**, consumed at alpha 1. Opaque literals carrying a hardcoded
+     background, so re-composite them against *our* bg:
+     `toTriplet(mix(theme.bg, fg, α))`. The ladder is α = .7 / .5 / .27 / .13 /
+     .05 / .04 for max / high / mid / low / soft / min (recovered by solving
+     Slack's shipped values back against `#1a1d21`).
+   - `--dt_color-*` — Slack's newer system, consumed **bare**, so these hold
+     **real colors**. `content-pry/sec/ter` drive text (sender names are
+     `content-pry`), `content-hgl-1` drives links and @mention slugs. Only the
+     foreground and outline families are mapped; the `base-` / `surf-`
+     backgrounds are left to the explicit pane rules, and `constants-white` /
+     `constants-black` are literals — never repoint them.
+   `--dt_color-plt-*` are raw palette primitives (~336 of them, triplet-consumed);
+   they're brand scales, not semantic slots, so they're deliberately unmapped.
+4. **Inline-important overrides** — Slack sets its own high-specificity inline
    styles (CSS custom props like `--rainbow-*`, `--saf-*`, and direct
    `background-color` on the rail/sidebar/nav on blur). External `!important` CSS
    loses to inline styles, so we re-write the same vars + direct paints
    **inline with `setProperty(..., "important")`** to win the cascade.
-4. **`paintActiveRows()`** — paints the selected-channel pill inline because
+5. **`paintActiveRows()`** — paints the selected-channel pill inline because
    Slack's React re-render stomps our CSS; a MutationObserver re-runs it.
-5. **MutationObservers** — re-inject the style if Slack removes it, keep active-row
+6. **MutationObservers** — re-inject the style if Slack removes it, keep active-row
    paint current, etc.
-6. **Color-mode automation** — `ensureSlackColorMode(isDark)` opens
+7. **Color-mode automation** — `ensureSlackColorMode(isDark)` opens
    Preferences → Appearance and toggles the radio via a MAIN-world React bridge
    (synthetic clicks don't fire Slack's handler reliably).
 
@@ -205,6 +225,24 @@ removes the need entirely. Consequences to preserve when editing:
   comments*. They're live template-literal syntax even in a comment, so a stray
   backtick silently terminates the string and the entire content script fails to
   parse (symptom: `Uncaught SyntaxError` and **all** theming disappears).
+- **Never write `*/` inside a CSS comment** in that literal either — most easily
+  done by accident in prose, e.g. a glob pair like `base-*` / `surf-*` written as
+  one token. It closes the comment early; the rest of the sentence parses as CSS
+  garbage and the *intended* `*/` becomes a stray error token, whose recovery
+  discards everything up to the next `;`. That silently eats **exactly one
+  declaration** — the next one. `node --check` cannot see this (the JS is valid),
+  and the symptom is maddening: one custom property simply missing from the CSSOM
+  while its neighbours are fine. Diagnose by comparing `/*` and `*/` counts in the
+  block, or check `[...rule.style]` for the property you expected.
+- **A design token's FORMAT is part of its contract — verify it, never assume.**
+  Some tokens hold real colors, others hold bare `r, g, b` triplets, and feeding
+  the wrong kind in produces a value that is *invalid at computed-value time*: the
+  declaration is dropped, and for an inherited property like `color` the cascade
+  unwinds to the UA default — **white under `color-scheme: dark`, black under
+  light**. So it fails as plausible-looking text in the wrong color rather than as
+  something obviously broken, and the failure flips with theme polarity. Read how
+  the site consumes a token before overriding it (`rgb(var(--x))` ⇒ triplet, bare
+  `var(--x)` ⇒ color) — see the audit recipe in Dev / test workflow.
 - Some surfaces (e.g. the rail/sidebar, and the Activity/Threads `All|VIP` tab
   strip — `p-activity_ia4_page__tab_menu` / `__tab_container`) are painted by
   Slack **inline with `!important`**, which beats even our high-specificity
@@ -224,8 +262,38 @@ There's no automated harness — changes are verified by hand against live Slack
    don't guess). The repo can't be inspected locally because the markup is Slack's.
 
 Note: Brave normally runs **without** a remote-debugging port, so an automated
-browser (Playwright) can't attach to the logged-in session. Inspect via DevTools
-in the user's own browser, or have the user paste DOM/console output.
+browser can't attach to the user's own logged-in session. But a **scratch
+Chromium can be driven directly**, which beats asking the user to paste DOM:
+
+```sh
+chromium --user-data-dir=~/.cache/omarchy-slack-test-profile \
+  --remote-debugging-port=9222 --load-extension=<repo>/extension \
+  --disable-features=DisableLoadExtensionCommandLineSwitch --no-first-run \
+  https://app.slack.com/          # log in once; the profile persists
+```
+
+Then `require("playwright-core").chromium.connectOverCDP("http://localhost:9222")`
+and drive `ctx.pages()` / `ctx.serviceWorkers()`. Gotchas, all learned the hard way:
+
+- Never `browser.close()` — it kills the externally launched window. `process.exit(0)`.
+- `chrome.runtime.reload()` is unreliable for unpacked extensions; **restart
+  chromium** to pick up edited files. Identify the browser process by `pgrep -x
+  chromium` + profile path + *absence* of `--type=`; matching on the debug port
+  also matches the launching shell and self-kills it.
+- With no native host in that profile, the extension gets **no theme**, so it
+  injects nothing. Push one from the service worker instead:
+  `chrome.tabs.sendMessage(tabId, {type:"omarchy-theme", theme})` with the host's
+  payload shape. A full page navigation loses it — re-push after every reload.
+- **Screenshots hang** when the window is occluded (no frames are composited);
+  `fromSurface: false` doesn't help. Assert on `getComputedStyle` instead — it's
+  more precise than a screenshot anyway.
+
+To audit how a site consumes a design token (the thing that makes token bugs
+diagnosable), walk the CSSOM in the page — Slack's stylesheets are same-origin
+and fully readable. Count `rgb(var(--x))` vs bare `var(--x)` to get the required
+format, and for a mystery color, list every rule declaring `color` that matches
+the element or an ancestor. `[...rule.style]` reveals declarations that were
+dropped at parse time.
 
 The **native host and install.sh**, unlike the CSS, *are* testable headlessly —
 do that rather than asking the user to click through a browser. Both honor

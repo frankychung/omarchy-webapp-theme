@@ -47,13 +47,93 @@ function applySlackTheme(theme, s) {
       --rainbow-mention-badge: ${accent} !important;
       --rainbow-mention-text: ${railBg} !important;
 
-      /* SK / SAF design tokens */
-      --sk_primary_background: ${theme.bg} !important;
-      --sk_primary_foreground: ${fg} !important;
-      --sk_secondary_background: ${sidebarBg} !important;
-      --sk_foreground_high: ${fg} !important;
-      --sk_foreground_max: ${fg} !important;
-      --sk_highlight: ${accent} !important;
+      /* ===== SK design tokens — TRIPLETS, not colors =====
+         Slack holds these as bare "r, g, b" channel lists and composites at the
+         point of use: color: rgba(var(--sk_primary_foreground), .7). We used to
+         write hex here, which built rgba(#a9b1d6, .7) — invalid at
+         computed-value time, so the declaration was dropped and color unwound
+         through identically-broken ancestors to the UA default: white under
+         color-scheme:dark, black under light. Message body text was never the
+         theme's fg at all; it just happened to be legible on dark themes. Two
+         verified counts, from auditing every consumer in Slack's stylesheets:
+         --sk_primary_foreground is wrapped in rgb()/rgba() 690 times vs 38 bare,
+         --sk_foreground_max 904 vs 2. Triplets it is. The few bare consumers
+         (color: var(--sk_primary_foreground) on a popover header, an avatar
+         initial) now inherit the correct themed color instead, which is right;
+         the handful of bare background-color ones fall back to transparent,
+         which reads acceptably on an already-themed surface.
+         Use toTriplet() on everything here — a hex in this block is a silent
+         regression, not a visible one. */
+      --sk_primary_background: ${toTriplet(theme.bg)} !important;
+      --sk_primary_foreground: ${toTriplet(fg)} !important;
+      --sk_secondary_background: ${toTriplet(sidebarBg)} !important;
+      --sk_highlight: ${toTriplet(accent)} !important;
+      --sk_highlight_hover: ${toTriplet(accent)} !important;
+      --sk_highlight_accent: ${toTriplet(accent)} !important;
+      /* Inverted pair: ink on an accent/emphasis fill, so it's the background
+         colour, and vice versa. Slack's dark values are literally its own
+         bg/fg swapped. */
+      --sk_inverted_foreground: ${toTriplet(theme.bg)} !important;
+      --sk_inverted_background: ${toTriplet(fg)} !important;
+
+      /* The emphasis ladder. Non-solid tokens are the raw ink — consumers supply
+         the alpha, e.g. rgba(var(--sk_foreground_high), .5), so all of them are
+         just fg. */
+      --sk_foreground_max: ${toTriplet(fg)} !important;
+      --sk_foreground_high: ${toTriplet(fg)} !important;
+      --sk_foreground_mid: ${toTriplet(fg)} !important;
+      --sk_foreground_low: ${toTriplet(fg)} !important;
+      --sk_foreground_min: ${toTriplet(fg)} !important;
+      --sk_foreground_soft: ${toTriplet(fg)} !important;
+
+      /* ...and their _solid twins, which are the SAME ink already flattened onto
+         the canvas, consumed at alpha 1. Slack bakes them against its own
+         #1a1d21: its shipped values solve back to exactly that background at
+         these alphas (171,171,173 = 70%, 129,131,133 = 50%, 53,55,59 = 13%),
+         which is how the ladder below was recovered. Because they're opaque
+         literals carrying a hardcoded background, leaving them alone paints
+         Slack's canvas into our text — barely visible on a dark theme whose bg
+         is near Slack's, and near-black-on-near-white on any light theme.
+         Re-composite them against OUR bg instead. */
+      --sk_foreground_max_solid: ${toTriplet(mix(theme.bg, fg, 0.7))} !important;
+      --sk_foreground_high_solid: ${toTriplet(mix(theme.bg, fg, 0.5))} !important;
+      --sk_foreground_mid_solid: ${toTriplet(mix(theme.bg, fg, 0.27))} !important;
+      --sk_foreground_low_solid: ${toTriplet(mix(theme.bg, fg, 0.13))} !important;
+      --sk_foreground_soft_solid: ${toTriplet(mix(theme.bg, fg, 0.05))} !important;
+      --sk_foreground_min_solid: ${toTriplet(mix(theme.bg, fg, 0.04))} !important;
+
+      /* ===== dt_color design tokens — REAL COLORS, not triplets =====
+         Slack is mid-migration to a second token system, --dt_color-*, and it
+         drives the surfaces the SK tokens no longer do: sender names read
+         var(--dt_color-content-pry), links and @mention slugs read
+         var(--dt_color-content-hgl-1). That's why a thread pane came out
+         part-themed — body text obeyed us while names stayed Slack's #f8f8f8
+         and mentions stayed Slack's #1264a3 cyan.
+         Opposite format rule from the block above: these are consumed BARE
+         (color: var(--dt_color-content-pry)), so they hold actual colors. A
+         triplet here breaks them exactly the way hex broke the SK tokens.
+         Format per token is a contract — verify, don't pattern-match.
+         Only the foreground and outline families are mapped. The base- and
+         surf- background tokens (--dt_color-base-pry alone is ~1100
+         background-color declarations) are deliberately left to the explicit
+         pane rules further down, which already own those surfaces; remapping
+         both would double-tint them. */
+      --dt_color-content-pry: ${fgStrong} !important;
+      --dt_color-content-sec: ${fg} !important;
+      --dt_color-content-ter: ${withAlpha(fg, 0.7)} !important;
+      --dt_color-content-hgl-1: ${accent} !important;
+      --dt_color-content-hgl-2: ${accent} !important;
+      /* Ink for text sitting on an inverted/emphasis fill — that fill is the
+         accent or the fg, so the readable ink there is the background. */
+      --dt_color-content-inv-pry: ${theme.bg} !important;
+      /* Focus ring + hairline. Slack ships otl-hgl-1 as its brand blue and
+         otl-ter as an alpha-hex (#5e5d6021); keep the alpha shape. */
+      --dt_color-otl-hgl-1: ${accent} !important;
+      --dt_color-otl-ter: ${borderColor} !important;
+      /* NOT mapped, on purpose: --dt_color-constants-white / -black are literal
+         colors (icon fills, ink on brand buttons), and --dt_color-content-imp is
+         the error red. Repointing literals inverts contrast — the same lesson the
+         Outlook pack records for --white/--black. */
       --saf-0: ${theme.bg} !important;
       --saf-1: ${sidebarBg} !important;
       --saf-2: ${railBg} !important;

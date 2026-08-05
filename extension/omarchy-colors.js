@@ -56,6 +56,20 @@ function withAlpha(hex, alpha) {
   return `rgba(${c.r}, ${c.g}, ${c.b}, ${alpha})`;
 }
 
+// Emit "r, g, b" — a bare channel list, NOT a color. Some design systems (see
+// Slack's --sk_* tokens) hold their palette as triplets and composite at the
+// point of use: `color: rgba(var(--sk_primary_foreground), .7)`. Feeding a real
+// color into one of those produces `rgba(#a9b1d6, .7)`, which is invalid at
+// computed-value time — the declaration is dropped and an inherited property
+// like `color` silently unwinds to the UA default (white under color-scheme:
+// dark, black under light) instead of failing visibly. Always verify how a token
+// is consumed before overriding it; the format is part of the contract.
+function toTriplet(color) {
+  const c = hexToRgb(color);
+  if (!c) return color;
+  return `${c.r}, ${c.g}, ${c.b}`;
+}
+
 function mix(hexA, hexB, t) {
   const a = hexToRgb(hexA);
   const b = hexToRgb(hexB);
