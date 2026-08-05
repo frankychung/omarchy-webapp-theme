@@ -163,10 +163,27 @@ install_hook() {
 }
 
 remove_hook() {
-  if [[ -L "$HOOKS_DIR/theme-set.d/$MARKER" || -f "$HOOKS_DIR/theme-set.d/$MARKER" ]]; then
-    rm -f "$HOOKS_DIR/theme-set.d/$MARKER"
-    echo "  removed hooks/theme-set.d/$MARKER"
+  local link="$HOOKS_DIR/theme-set.d/$MARKER"
+  [[ -L $link || -f $link ]] || return 0
+
+  # Only remove the hook WE installed. A git checkout and the package both use
+  # this same marker name but point it at their own tree, so a clone's
+  # --uninstall must not delete the symlink a packaged install owns (and vice
+  # versa). Getting this wrong is silent and total: the host has no polling
+  # fallback, so with no hook there is no SIGUSR1 and themes simply stop
+  # updating, while --load-extension and the host manifest still look fine.
+  if [[ -L $link ]]; then
+    local have want
+    have=$(readlink -f "$link" 2>/dev/null || true)
+    want=$(readlink -f "$HOOK_SCRIPT" 2>/dev/null || true)
+    if [[ -n $have && -n $want && $have != "$want" ]]; then
+      echo "  kept hooks/theme-set.d/$MARKER (owned by another install: $have)"
+      return 0
+    fi
   fi
+
+  rm -f "$link"
+  echo "  removed hooks/theme-set.d/$MARKER"
 }
 
 # ------------------------------------------------------- legacy (pre-rename) --
