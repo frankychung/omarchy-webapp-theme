@@ -1,6 +1,6 @@
 pkgbase = omarchy-webapp-theme
 	pkgdesc = Make Slack, Discord, GitHub, Linear, Outlook and WhatsApp follow your Omarchy theme
-	pkgver = 0.3.0
+	pkgver = 0.3.1
 	pkgrel = 1
 	url = https://github.com/scottjones/omarchy-webapp-theme
 	install = omarchy-webapp-theme.install
@@ -14,7 +14,7 @@ pkgbase = omarchy-webapp-theme
 	provides = omarchy-slack-theme
 	conflicts = omarchy-slack-theme
 	replaces = omarchy-slack-theme
-	source = omarchy-webapp-theme-0.3.0.tar.gz::https://github.com/scottjones/omarchy-webapp-theme/archive/refs/tags/v0.3.0.tar.gz
+	source = omarchy-webapp-theme-0.3.1.tar.gz::https://github.com/scottjones/omarchy-webapp-theme/archive/refs/tags/v0.3.1.tar.gz
 	sha256sums = dde3813465c272410b9e0ae30951e6babb8bba7bd45ce719187eb717d1b870ba
 
 pkgname = omarchy-webapp-theme
