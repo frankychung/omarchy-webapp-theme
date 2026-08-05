@@ -24,9 +24,9 @@ conflicts=('omarchy-slack-theme')
 provides=('omarchy-slack-theme')
 install="$pkgname.install"
 source=("$pkgname-$pkgver.tar.gz::$url/archive/refs/tags/v$pkgver.tar.gz")
-# Pinned to the published v0.3.0 tag tarball. Regenerate with `updpkgsums` on
+# Pinned to the published v0.3.1 tag tarball. Regenerate with `updpkgsums` on
 # every version bump — a stale sum fails the build for everyone.
-sha256sums=('dde3813465c272410b9e0ae30951e6babb8bba7bd45ce719187eb717d1b870ba')
+sha256sums=('a8e029662905b96eab3e30ddb6986bd829632ddd8fe43246ed37edb7fc0946b4')
 
 package() {
   cd "$srcdir/$pkgname-$pkgver"
