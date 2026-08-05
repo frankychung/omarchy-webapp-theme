@@ -15,6 +15,6 @@ pkgbase = omarchy-webapp-theme
 	conflicts = omarchy-slack-theme
 	replaces = omarchy-slack-theme
 	source = omarchy-webapp-theme-0.3.1.tar.gz::https://github.com/scottjones/omarchy-webapp-theme/archive/refs/tags/v0.3.1.tar.gz
-	sha256sums = dde3813465c272410b9e0ae30951e6babb8bba7bd45ce719187eb717d1b870ba
+	sha256sums = a8e029662905b96eab3e30ddb6986bd829632ddd8fe43246ed37edb7fc0946b4
 
 pkgname = omarchy-webapp-theme
