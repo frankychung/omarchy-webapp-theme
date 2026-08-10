@@ -567,8 +567,15 @@ OmarchyTheme.register({
     const contentMuted = withAlpha(s.fg, s.isDark ? 0.45 : 0.5);
     const codeBg = withAlpha(s.fg, s.isDark ? 0.08 : 0.06);
     const pal = theme.colors || {};
-    const success = pal.green || (s.isDark ? "#3fb950" : "#40a02b");
-    const danger = pal.red || (s.isDark ? "#f85149" : "#d20f39");
+    // Resolved by hue, not by slot name — a palette's `green` is not reliably
+    // green (matte-black's is #FFC107, an amber) and these two drive Linear's
+    // done/cancelled state colors, where the wrong hue misreports state. Danger
+    // is claimed first so success has to stay perceptually clear of it. See
+    // statusColor() in omarchy-colors.js.
+    const statusTaken = [];
+    const danger = statusColor(pal, "danger", statusTaken, s.isDark ? "#f85149" : "#d20f39");
+    statusTaken.push(danger);
+    const success = statusColor(pal, "success", statusTaken, s.isDark ? "#3fb950" : "#40a02b");
 
     const vars = {
       // ----- Base / page / sidebar -----
