@@ -275,6 +275,37 @@ function statusColor(palette, role, taken, fallback) {
   return best || fallback;
 }
 
+// The palette's most perceptually DISTANT real colour from `avoid`, for markers
+// that must stand out rather than mean something. Status roles are the wrong tool
+// there: they refuse to invent a hue that isn't present, which is right for
+// "pending" or "failed" but leaves a marker with nothing at all on a palette that
+// simply has no warm colour. spacex-terrafab is the case in point — every slot
+// sits between hue 184 and 276, its "red" is #9c8ba9 (a violet) and its "yellow"
+// is #c4f6ff (a cyan) — so attention and danger both correctly decline, yet
+// #bcfbff still sits 50 dE from that theme's accent and reads unmistakably.
+//
+// Requires real chroma, and enough contrast against `surface` to be visible as a
+// hairline. Returns null when nothing clears the distinctness floor, so callers
+// keep their own last resort.
+function highlightColor(palette, avoid, surface, minChroma) {
+  const pal = palette || {};
+  const floor = minChroma == null ? 18 : minChroma;
+  let best = null;
+  let bestScore = -Infinity;
+  for (const slot of Object.keys(pal)) {
+    if (STRUCTURAL_SLOTS.has(slot)) continue;
+    const color = pal[slot];
+    if (!color || chromaOf(color) < floor) continue;
+    if (surface && contrastRatio(color, surface) < 3) continue;
+    const d = deltaE(color, avoid);
+    if (d > bestScore) {
+      bestScore = d;
+      best = color;
+    }
+  }
+  return bestScore >= ROLE_MIN_DELTA_E ? best : null;
+}
+
 // Resolve all four together. Order is deliberate — danger and success are the
 // two a user is most likely to act on, so they get first claim on the palette
 // and later roles must stay clear of them rather than the other way round.

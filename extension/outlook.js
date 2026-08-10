@@ -123,7 +123,7 @@ function retintOutlookSubstitutionTable(surfaces) {
   }
 }
 
-function retintOutlookPaper(s) {
+function retintOutlookPaper(s, nowMarker) {
   // Exactly the reading pane's own colour, NOT a step off it. The message body
   // fills the pane edge to edge, so any offset — even a subtle one — reads as a
   // mismatched slab dropped into the pane rather than as elevation. Paper and
@@ -133,6 +133,9 @@ function retintOutlookPaper(s) {
 
   // Path 1: the substitution table (composer, signatures, quoted replies).
   retintOutlookSubstitutionTable(surfaces);
+
+  // The calendar's now-marker — shape-anchored, see the helper.
+  retintOutlookNowMarker(nowMarker);
 
   // Path 2: received mail, where the transform writes the resolved colour
   // straight onto the element as an inline literal and records the original in
@@ -164,10 +167,57 @@ function retintOutlookPaper(s) {
   }
 }
 
+// The calendar's "now" marker: a dashed line across today's column with a round
+// knob at its left edge. Outlook draws both from --themePrimary, which the pack
+// maps to the accent — so the one marker you scan the grid for ended up the same
+// colour as everything else on it. Unthemed Outlook draws it red, and that reads
+// as "now" precisely because nothing else in the grid is red.
+//
+// This CANNOT be done in the stylesheet, and the two obvious attempts both fail:
+//
+//   - Re-scoping --themePrimary to the day grid also recolours the SELECTED TIME
+//     SLOT, which reads the same token and lives in the same grid (measured: the
+//     other consumer sits under an element labelled "5:30 PM to 6:00 PM,
+//     Monday"). A selection turning red is worse than the bug.
+//   - Widening to [data-app-section^="calendar-view"] is worse still: it also
+//     matches "calendar-view-header-0", the header strip, taking the date
+//     numbers, the new-event "+" and the today-column border red with it.
+//
+// The marker's own classes are hashed (tWCGp / lJS6W), so they can't be named.
+// What IS stable is its shape, which only JS can test: inside the day grid there
+// is exactly ONE element with a circular ::before (the knob) and exactly ONE with
+// a dashed top border (the line), and they are siblings. Anchor on the circle,
+// paint it and its dashed sibling, touch nothing else.
+//
+// Inline + important because Outlook's own rules set these through the token.
+function retintOutlookNowMarker(color) {
+  if (!color) return;
+  const grid = document.querySelector(
+    '[data-app-section^="calendar-view"][class*="inDayContentChild"]',
+  );
+  if (!grid) return;
+  for (const el of grid.querySelectorAll("div")) {
+    const before = getComputedStyle(el, "::before");
+    if (!before || before.content === "none") continue;
+    const radius = before.borderRadius || "";
+    if (!(radius.includes("100%") || radius.includes("50%"))) continue;
+    if (before.backgroundColor === "rgba(0, 0, 0, 0)") continue;
+    // The knob paints via its own background; ::before inherits it.
+    el.style.setProperty("background-color", color, "important");
+    const parent = el.parentElement;
+    if (!parent) continue;
+    for (const sib of parent.children) {
+      if (sib === el) continue;
+      if (getComputedStyle(sib).borderTopStyle !== "dashed") continue;
+      sib.style.setProperty("border-top-color", color, "important");
+    }
+  }
+}
+
 let outlookPaperObserver = null;
 let outlookPaperQueued = false;
 
-function watchOutlookPaper(s) {
+function watchOutlookPaper(s, nowMarker) {
   if (!document.body) return;
   // Create the colour probe BEFORE the observer exists. It has to live in the
   // document to have a computed style, and the observer watches body's subtree
@@ -178,7 +228,7 @@ function watchOutlookPaper(s) {
     outlookColorProbe.style.display = "none";
     document.body.appendChild(outlookColorProbe);
   }
-  retintOutlookPaper(s);
+  retintOutlookPaper(s, nowMarker);
   if (outlookPaperObserver) outlookPaperObserver.disconnect();
   // childList/subtree ONLY. Our repaint writes the style attribute, so observing
   // attributes would feed our own change straight back in as a mutation loop.
@@ -187,7 +237,7 @@ function watchOutlookPaper(s) {
     outlookPaperQueued = true;
     requestAnimationFrame(() => {
       outlookPaperQueued = false;
-      retintOutlookPaper(s);
+      retintOutlookPaper(s, nowMarker);
     });
   });
   outlookPaperObserver.observe(document.body, { childList: true, subtree: true });
@@ -375,6 +425,28 @@ OmarchyTheme.register({
     const thumb = withAlpha(s.fg, 0.15);
     const thumbHover = withAlpha(s.fg, 0.3);
 
+    // "Now" marker on the calendar — see retintOutlookNowMarker().
+    //
+    // A highlight drawn from the theme rather than a hardcoded red: amber reads
+    // as "look here" without implying an error. Resolved by HUE so a slot merely
+    // NAMED yellow can't hand back a green, and the ACCENT is passed as `taken`
+    // so the result must be perceptually distinct from it (>= 18 dE) — otherwise
+    // a theme whose accent is already amber would put the marker right back to
+    // blending into the grid, which is the bug being fixed.
+    //
+    // Falls through amber -> red -> the palette's most distant colour -> a real
+    // red. The third step matters on palettes with no warm hue at all: on
+    // spacex-terrafab every slot is a blue or a violet (its "red" is #9c8ba9),
+    // so amber and red both correctly decline, and without it the marker would
+    // land on a hardcoded red that belongs to no part of the theme. There, the
+    // palette's own #bcfbff sits 50 dE from the accent and reads at a glance.
+    const pal = theme.colors || {};
+    const nowMarker =
+      statusColor(pal, "attention", [s.accent], null) ||
+      statusColor(pal, "danger", [s.accent], null) ||
+      highlightColor(pal, s.accent, s.bg) ||
+      (s.isDark ? "#f85149" : "#d20f39");
+
     const regions = [
       '[data-app-section="MessageList"]',
       '[data-app-section="NavigationPane"]',
@@ -418,6 +490,9 @@ OmarchyTheme.register({
         "  --neutralSecondarySurface: " + listBand + " !important;" +
         "}",
 
+      // NB: the calendar's current-time marker is NOT handled here — it can't be.
+      // See retintOutlookNowMarker() for why a stylesheet can't express it.
+
       // Scrollbars. Outlook points the thumb at --colorNeutralStroke1, a 22%
       // foreground wash built for BORDERS, which makes the bar the brightest
       // thing in a quiet list. Give it its own recessive value instead of
@@ -434,6 +509,6 @@ OmarchyTheme.register({
     // body. Inline + observed rather than declared, for the reasons above the
     // helper: the transform writes inline !important, and it re-runs whenever the
     // reading pane swaps to another message.
-    watchOutlookPaper(s);
+    watchOutlookPaper(s, nowMarker);
   },
 });
