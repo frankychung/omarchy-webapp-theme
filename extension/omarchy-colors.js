@@ -229,11 +229,24 @@ const STRUCTURAL_SLOTS = new Set([
 // "red" is evidence of intent, so miasma's muted #685742 still earns danger. An
 // unnamed candidate we picked ourselves has no such backing, so it must be
 // unambiguously colorful and not near-black/near-white.
-const NAMED_MIN_CHROMA = 8;
+// Named slots used to need only chroma >= 8 on the theory that the author calling
+// something "red" was evidence enough. It isn't: miasma's red is #685742, chroma
+// 15.2 — a brown — and ethereal's green is #92a593, chroma 12.4, a desaturated
+// sage. Both passed, and a brown "failed check" doesn't read as failed. A status
+// colour has to be recognisably its own hue before intent counts for anything,
+// so the floor is now high enough to demand an actual colour while still well
+// under the level a deliberately muted palette can reach.
+const NAMED_MIN_CHROMA = 20;
 const SEARCHED_MIN_CHROMA = 25;
 const SEARCHED_L_RANGE = [25, 90];
 // Below this two roles read as "the same color" at a glance.
 const ROLE_MIN_DELTA_E = 18;
+// ...and dE alone isn't enough for THESE roles. Two oranges can sit 20 dE apart
+// and still both read "orange": retro-82 resolved danger at hue 14 and attention
+// at hue 22, eight degrees apart, so "failing" and "in progress" were the same
+// colour to a glance even though the perceptual distance passed. Roles must also
+// be separated around the hue wheel.
+const ROLE_MIN_HUE_SEPARATION = 35;
 
 function statusCandidateOk(color, role, taken, named) {
   const spec = STATUS_ROLES[role];
@@ -244,7 +257,15 @@ function statusCandidateOk(color, role, taken, named) {
     const L = labOf(color).L;
     if (L < SEARCHED_L_RANGE[0] || L > SEARCHED_L_RANGE[1]) return false;
   }
-  return taken.every((other) => deltaE(color, other) >= ROLE_MIN_DELTA_E);
+  const hue = hueOf(color);
+  return taken.every((other) => {
+    if (deltaE(color, other) < ROLE_MIN_DELTA_E) return false;
+    // An achromatic neighbour can't be confused by hue, and hueDistance() would
+    // read its null hue as 0 and measure from red.
+    const otherHue = hueOf(other);
+    if (otherHue == null) return true;
+    return hueDistance(hue, otherHue) >= ROLE_MIN_HUE_SEPARATION;
+  });
 }
 
 // Resolve one role. `taken` is the colors already assigned to other roles.
@@ -310,13 +331,56 @@ function highlightColor(palette, avoid, surface, minChroma) {
 // two a user is most likely to act on, so they get first claim on the palette
 // and later roles must stay clear of them rather than the other way round.
 // `defaults` supplies the site's own shipped colors, keyed by role.
+// Do two roles read as the same colour? Both tests matter: dE catches "these are
+// the same shade", hue separation catches "these are both orange".
+function statusRolesClash(a, b) {
+  if (!a || !b) return false;
+  if (deltaE(a, b) < ROLE_MIN_DELTA_E) return true;
+  const ha = hueOf(a);
+  const hb = hueOf(b);
+  if (ha == null || hb == null) return false;
+  return hueDistance(ha, hb) < ROLE_MIN_HUE_SEPARATION;
+}
+
 function statusPalette(palette, defaults) {
+  const defs = defaults || {};
+  const roles = ["danger", "success", "attention", "done"];
   const out = {};
   const taken = [];
-  for (const role of ["danger", "success", "attention", "done"]) {
-    const color = statusColor(palette, role, taken, (defaults || {})[role]);
+  for (const role of roles) {
+    const color = statusColor(palette, role, taken, defs[role]);
     if (color) taken.push(color);
     out[role] = color;
+  }
+
+  // Repair pass. statusColor() returns its fallback WITHOUT the distinctness
+  // test — the palette had nothing to offer, so there was nothing to test — and
+  // that can seat the site's amber right next to a themed red: miasma ended up
+  // with danger #b36d43 (hue 23) beside the fallback attention #d29922 (hue 41),
+  // 18 degrees apart, which is the same "can't tell failing from pending" problem
+  // the hue rule exists to prevent.
+  //
+  // The site's own four are mutually distinct by construction (Primer's are all
+  // >= 37 degrees apart), so whenever a fallback clashes with a themed sibling,
+  // drop that sibling to ITS default too and re-check. Each step moves one role
+  // to a default and never back, so this terminates.
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const a of roles) {
+      for (const b of roles) {
+        if (a === b || !statusRolesClash(out[a], out[b])) continue;
+        const aDefault = out[a] === defs[a];
+        const bDefault = out[b] === defs[b];
+        if (aDefault && !bDefault && defs[b]) {
+          out[b] = defs[b];
+          changed = true;
+        } else if (bDefault && !aDefault && defs[a]) {
+          out[a] = defs[a];
+          changed = true;
+        }
+      }
+    }
   }
   return out;
 }
