@@ -129,12 +129,31 @@ registerWhenClassified({
 
     // Soft status fills — keep Primer's hue roles but tint from the terminal
     // palette when the host sent colors.toml entries.
+    //
+    // These are resolved by HUE, not by slot name. Reading `pal.yellow` for
+    // attention looks obviously right and is wrong on a third of the shipped
+    // themes: osaka-jade's `yellow` is #459451, a green, which painted GitHub's
+    // in-progress spinner and pending-check dots the same green as "all checks
+    // passed". statusPalette() checks that a candidate's hue matches the role,
+    // that the four stay perceptually distinct from each other, and falls back
+    // to Primer's own values when the palette has no honest match (monochrome
+    // themes, or single-hue ones like lumon). See omarchy-colors.js.
     const pal = theme.colors || {};
-    const success = pal.green || "#3fb950";
-    const danger = pal.red || "#f85149";
-    const attention = pal.yellow || "#d29922";
-    const done = pal.magenta || pal.bright_magenta || "#ab7df8";
-    const open = pal.green || success;
+    const status = statusPalette(pal, {
+      success: "#3fb950",
+      danger: "#f85149",
+      attention: "#d29922",
+      done: "#ab7df8",
+    });
+    const success = status.success;
+    const danger = status.danger;
+    const attention = status.attention;
+    const done = status.done;
+    // Primer's open/closed are issue+PR state, and GitHub renders them with the
+    // same green/red semantics as success/danger — so reuse those rather than
+    // re-deriving, which could pick a different green and make an open issue and
+    // a passing check disagree.
+    const open = success;
     const closed = danger;
 
     return {

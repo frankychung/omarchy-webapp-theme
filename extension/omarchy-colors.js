@@ -117,3 +117,175 @@ function mix(hexA, hexB, t) {
   const bl = Math.round(a.b * (1 - t) + b.b * t);
   return `rgb(${r}, ${g}, ${bl})`;
 }
+
+// ===== semantic status colors =============================================
+//
+// success / danger / attention / done are NOT decorative. GitHub paints a
+// pending check amber and a passing one green, so getting the hue wrong doesn't
+// look slightly off — it MISREPORTS STATE. Two traps, both hit in practice:
+//
+//  1. A SLOT'S NAME DOES NOT PROMISE ITS HUE. osaka-jade ships
+//     yellow = #459451 (a green, hue 129) and matte-black ships
+//     green = #FFC107 (an amber) alongside yellow = #b91c1c (a red). 14 of the
+//     28 themes on a stock machine have at least one such slot. Reading
+//     `pal.yellow` for "attention" painted GitHub's in-progress spinner green —
+//     visually identical to "all checks passed".
+//  2. SOME PALETTES HAVE NO SUCH COLOR AT ALL. `white` and `vantablack` are
+//     monochrome by design; `lumon` is blue end to end. There is nothing honest
+//     to pick, and a faked status color is worse than an unthemed one — the
+//     site's own default at least still means what the site says it means.
+//
+// Strategy: try the conventionally-named slots first (ANSI color1/2/3/5 and
+// their bright twins included — that numbering is itself a convention), accept
+// one only when its hue actually matches the role AND it stays perceptually
+// clear of the roles already assigned, otherwise search the rest of the palette,
+// otherwise fall back to the site's default.
+//
+// Hue classification uses HSL (cheap, and it's the space these palettes are
+// authored in) while the "is this actually a color" and "are two roles
+// distinguishable" tests use CIELab, which is perceptual. That split matters:
+// a near-black like #12140e scores 0.18 HSL *saturation* but has almost no Lab
+// chroma, and it slipped through an early saturation-only gate as a "green".
+
+// CIELab, reusing the same gamma decode as relLuminance so this agrees with the
+// WCAG math elsewhere in this file. D65 white point.
+function labOf(color) {
+  const c = hexToRgb(color);
+  if (!c) return null;
+  const x = (channelLuminance(c.r) * 0.4124 + channelLuminance(c.g) * 0.3576 +
+             channelLuminance(c.b) * 0.1805) / 0.95047;
+  const y = channelLuminance(c.r) * 0.2126 + channelLuminance(c.g) * 0.7152 +
+            channelLuminance(c.b) * 0.0722;
+  const z = (channelLuminance(c.r) * 0.0193 + channelLuminance(c.g) * 0.1192 +
+             channelLuminance(c.b) * 0.9505) / 1.08883;
+  const f = (t) => (t > 0.008856 ? Math.cbrt(t) : 7.787 * t + 16 / 116);
+  const fx = f(x), fy = f(y), fz = f(z);
+  return { L: 116 * fy - 16, a: 500 * (fx - fy), b: 200 * (fy - fz) };
+}
+
+// Lab chroma — distance from the neutral axis. Unlike HSL saturation this does
+// not inflate at extreme lightness, so it's the honest "is this a color" test.
+function chromaOf(color) {
+  const lab = labOf(color);
+  return lab ? Math.sqrt(lab.a * lab.a + lab.b * lab.b) : 0;
+}
+
+// CIE76. Crude next to CIEDE2000, but we only need a "clearly different color"
+// threshold, and it's a handful of lines instead of forty.
+function deltaE(colorA, colorB) {
+  const a = labOf(colorA);
+  const b = labOf(colorB);
+  if (!a || !b) return 0;
+  return Math.sqrt((a.L - b.L) ** 2 + (a.a - b.a) ** 2 + (a.b - b.b) ** 2);
+}
+
+// HSL hue in degrees, or null when the color is achromatic (hue is undefined
+// for greys — that's the signal monochrome themes give us).
+function hueOf(color) {
+  const c = hexToRgb(color);
+  if (!c) return null;
+  const r = c.r / 255, g = c.g / 255, b = c.b / 255;
+  const mx = Math.max(r, g, b), mn = Math.min(r, g, b);
+  const d = mx - mn;
+  if (d === 0) return null;
+  let h;
+  if (mx === r) h = ((g - b) / d + 6) % 6;
+  else if (mx === g) h = (b - r) / d + 2;
+  else h = (r - g) / d + 4;
+  return h * 60;
+}
+
+function hueDistance(hue, target) {
+  if (hue == null) return Infinity;
+  const d = Math.abs(hue - target) % 360;
+  return Math.min(d, 360 - d);
+}
+
+// target: the hue a role should read as. tolerance: how far a candidate may sit
+// from it — wider for green because terminal "greens" skew olive (gruvbox 70°,
+// everforest 83°) and narrower for amber, which turns into orange or lime fast.
+// preferred: slots to try in order before searching, most conventional first.
+const STATUS_ROLES = {
+  danger:    { target: 2,   tolerance: 50, preferred: ["red", "bright_red", "color1", "color9"] },
+  success:   { target: 105, tolerance: 55, preferred: ["green", "bright_green", "color2", "color10"] },
+  attention: { target: 45,  tolerance: 40, preferred: ["yellow", "bright_yellow", "orange", "color3", "color11"] },
+  done:      { target: 300, tolerance: 50, preferred: ["magenta", "bright_magenta", "color5", "color13"] },
+};
+
+// Slots that describe the UI's structure rather than its palette. Never status
+// candidates — `background` being coincidentally green-ish must not make it the
+// success color.
+const STRUCTURAL_SLOTS = new Set([
+  "background", "dark_background", "darker_background", "lighter_background",
+  "foreground", "dark_foreground", "light_foreground", "bright_foreground",
+  "selection", "selection_background", "selection_foreground", "muted",
+  "accent", "cursor", "cursor_text", "border", "mode",
+  "active_border_color", "inactive_border_color",
+  "active_tab_background", "active_tab_foreground",
+  "inactive_tab_background", "inactive_tab_foreground",
+]);
+
+// A named slot only has to be recognisably its own hue — the author calling it
+// "red" is evidence of intent, so miasma's muted #685742 still earns danger. An
+// unnamed candidate we picked ourselves has no such backing, so it must be
+// unambiguously colorful and not near-black/near-white.
+const NAMED_MIN_CHROMA = 8;
+const SEARCHED_MIN_CHROMA = 25;
+const SEARCHED_L_RANGE = [25, 90];
+// Below this two roles read as "the same color" at a glance.
+const ROLE_MIN_DELTA_E = 18;
+
+function statusCandidateOk(color, role, taken, named) {
+  const spec = STATUS_ROLES[role];
+  if (!spec || !color) return false;
+  if (hueDistance(hueOf(color), spec.target) > spec.tolerance) return false;
+  if (chromaOf(color) < (named ? NAMED_MIN_CHROMA : SEARCHED_MIN_CHROMA)) return false;
+  if (!named) {
+    const L = labOf(color).L;
+    if (L < SEARCHED_L_RANGE[0] || L > SEARCHED_L_RANGE[1]) return false;
+  }
+  return taken.every((other) => deltaE(color, other) >= ROLE_MIN_DELTA_E);
+}
+
+// Resolve one role. `taken` is the colors already assigned to other roles.
+// Returns the site's `fallback` when the palette has nothing honest to offer.
+function statusColor(palette, role, taken, fallback) {
+  const spec = STATUS_ROLES[role];
+  const pal = palette || {};
+  const chosen = taken || [];
+  if (!spec) return fallback;
+
+  for (const slot of spec.preferred) {
+    if (pal[slot] && statusCandidateOk(pal[slot], role, chosen, true)) return pal[slot];
+  }
+
+  let best = null;
+  let bestScore = Infinity;
+  for (const slot of Object.keys(pal)) {
+    if (STRUCTURAL_SLOTS.has(slot)) continue;
+    const color = pal[slot];
+    if (!statusCandidateOk(color, role, chosen, false)) continue;
+    // closest hue wins; chroma breaks ties toward the more vivid candidate
+    const score = hueDistance(hueOf(color), spec.target) - chromaOf(color) / 10;
+    if (score < bestScore) {
+      best = color;
+      bestScore = score;
+    }
+  }
+  return best || fallback;
+}
+
+// Resolve all four together. Order is deliberate — danger and success are the
+// two a user is most likely to act on, so they get first claim on the palette
+// and later roles must stay clear of them rather than the other way round.
+// `defaults` supplies the site's own shipped colors, keyed by role.
+function statusPalette(palette, defaults) {
+  const out = {};
+  const taken = [];
+  for (const role of ["danger", "success", "attention", "done"]) {
+    const color = statusColor(palette, role, taken, (defaults || {})[role]);
+    if (color) taken.push(color);
+    out[role] = color;
+  }
+  return out;
+}

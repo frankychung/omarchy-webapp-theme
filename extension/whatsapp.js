@@ -124,8 +124,13 @@ OmarchyTheme.register({
     const pal = theme.colors || {};
     // Success-semantic green: prefer the theme's green so "positive" things
     // stay green-ish when the palette has one; otherwise the accent.
-    vars["--WDS-secondary-positive"] = pal.green || s.accent;
-    vars["--WDS-secondary-positive-RGB"] = rgb(pal.green || s.accent);
+    // Matched by HUE rather than by the slot's name — `pal.green` is an amber in
+    // matte-black and a blue in lumon, either of which would make WhatsApp's
+    // "positive" affordances read as something else. Falls back to the accent
+    // (not a hardcoded green) so the pack stays theme-coherent as before.
+    const positive = statusColor(pal, "success", [], s.accent);
+    vars["--WDS-secondary-positive"] = positive;
+    vars["--WDS-secondary-positive-RGB"] = rgb(positive);
     const avatarColors = {
       green: pal.green || s.accent,
       teal: pal.cyan || s.accent,
