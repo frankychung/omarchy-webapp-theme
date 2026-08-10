@@ -130,6 +130,15 @@ function applySlackTheme(theme, s) {
          otl-ter as an alpha-hex (#5e5d6021); keep the alpha shape. */
       --dt_color-otl-hgl-1: ${accent} !important;
       --dt_color-otl-ter: ${borderColor} !important;
+      /* The one base- token that IS mapped, and deliberately: base-inv-hgl-2 is
+         #007a5a — Slack's brand green — and it is the FILL of a confirm button
+         rather than a page surface, so the base-/surf- reasoning above doesn't
+         apply to it. It's also the shared source both halves of a split button
+         read: the c-button--primary selector below catches the text half, but
+         the caret half is an icon button that selector misses, so the caret came
+         out brand green next to an accent-filled "Forward". Mapping the token
+         fixes both halves at the source, and the other ~139 consumers with it. */
+      --dt_color-base-inv-hgl-2: ${accent} !important;
       /* NOT mapped, on purpose: --dt_color-constants-white / -black are literal
          colors (icon fills, ink on brand buttons), and --dt_color-content-imp is
          the error red. Repointing literals inverts contrast — the same lesson the
@@ -235,10 +244,26 @@ function applySlackTheme(theme, s) {
       border-color: var(--omarchy-border) !important;
     }
 
-    /* Slack's brand-green primary buttons → the omarchy accent. */
-    html body [class*="c-button--primary"] {
+    /* Slack's brand-green primary buttons → the omarchy accent.
+       The :not() is load-bearing. Without it this also painted DISABLED primary
+       buttons at full accent, so a disabled button looked clickable — visible on
+       the Forward dialog, where the greyed-out caret sat beside a confident
+       accent-filled "Forward". Slack marks the state with c-button--disabled. */
+    html body [class*="c-button--primary"]:not([class*="c-button--disabled"]) {
       background-color: var(--omarchy-accent) !important;
       border-color: var(--omarchy-accent) !important;
+    }
+
+    /* Disabled primary buttons, and the caret half of a split button, which is an
+       icon button rather than a c-button--primary and so needs naming separately.
+       Slack fills its disabled state from --dt_color-base-ter, a general
+       tertiary surface with 479 uses that must not be remapped wholesale, so the
+       two halves are matched here instead and given one themed muted fill. */
+    html body [class*="c-button--primary"][class*="c-button--disabled"],
+    html body [class*="schedule_send_button"][class*="c-button--disabled"] {
+      background-color: ${withAlpha(fg, 0.12)} !important;
+      border-color: transparent !important;
+      color: ${withAlpha(fg, 0.38)} !important;
     }
 
     /* The "Today" tab's own pane wrapper (hashed class — match the stable
