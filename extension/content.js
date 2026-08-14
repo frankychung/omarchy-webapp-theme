@@ -1220,6 +1220,7 @@ let lastAppliedMode = null; // "Light" | "Dark" | null
 // Color-mode flip deferred because the tab was hidden — see armVisibilityRetry.
 let pendingColorMode = null; // boolean targetIsDark, or null
 let visibilityRetryArmed = false;
+let visibilityRetryTimer = null;
 
 // Chromium throttles timers HARD in a hidden tab: a 1s setTimeout chain
 // measured a 2s median and a 60.6s maximum gap (intensive throttling kicks in
@@ -1232,18 +1233,27 @@ let visibilityRetryArmed = false;
 // throttled and fires the moment the user looks at Slack again.
 function armVisibilityRetry(targetIsDark) {
   pendingColorMode = targetIsDark; // latest theme wins if several land while hidden
-  if (visibilityRetryArmed) return;
+  if (visibilityRetryArmed) {
+    // Already listening — but if the tab came back between the hidden check
+    // and subscribe, that visibilitychange is gone. Kick now rather than
+    // waiting for the user to hide and show Slack again.
+    if (!document.hidden) onVisibilityRetry();
+    return;
+  }
   visibilityRetryArmed = true;
+  document.addEventListener("visibilitychange", onVisibilityRetry);
+  if (!document.hidden) onVisibilityRetry();
+}
 
-  const onVisible = () => {
-    if (document.hidden) return;
-    document.removeEventListener("visibilitychange", onVisible);
-    visibilityRetryArmed = false;
+function onVisibilityRetry() {
+  if (document.hidden) return;
+  document.removeEventListener("visibilitychange", onVisibilityRetry);
+  visibilityRetryArmed = false;
+  if (visibilityRetryTimer != null) return;
 
-    const target = pendingColorMode;
-    pendingColorMode = null;
-    if (target === null) return;
-
+  // Slack's React tree needs a beat after the tab wakes before it responds.
+  visibilityRetryTimer = setTimeout(() => {
+    visibilityRetryTimer = null;
     // Wait out the automating lock rather than dropping the retry on the floor
     // (the lock is held for 500ms after a run finishes). Timers are reliable
     // again now that we're visible.
@@ -1252,25 +1262,34 @@ function armVisibilityRetry(targetIsDark) {
         setTimeout(run, 300);
         return;
       }
+      // Read pending at execution time, not at visibilitychange: a theme that
+      // lands in the 400ms wake delay (or while we waited out the lock) should
+      // win, and a live ensureSlackColorMode claim clears pending so we don't
+      // undo it.
+      const target = pendingColorMode;
+      pendingColorMode = null;
+      if (target === null) return;
       console.log("[omarchy] tab visible again; running deferred color-mode flip");
       ensureSlackColorMode(target).catch((e) =>
         console.warn("[omarchy] deferred color-mode automation failed:", e)
       );
     };
-    // Slack's React tree needs a beat after the tab wakes before it responds.
-    setTimeout(run, 400);
-  };
-
-  document.addEventListener("visibilitychange", onVisible);
+    run();
+  }, 400);
 }
 
 function sleep(ms) {
+  // Hidden-tab timers are throttled to ~1 wake/minute. Don't start one.
+  if (document.hidden) return Promise.resolve();
   return new Promise((r) => setTimeout(r, ms));
 }
 
 async function waitFor(predicate, timeout = 3000, interval = 50) {
   const start = Date.now();
   while (Date.now() - start < timeout) {
+    // Fail fast: a hidden tab will not meet the deadline, and spinning here
+    // holds the automating lock for however long Chromium sleeps us.
+    if (document.hidden) return null;
     const result = predicate();
     if (result) return result;
     await sleep(interval);
@@ -1746,7 +1765,22 @@ async function ensureSlackColorMode(targetIsDark) {
   // Synchronous claim — set BEFORE any await so concurrent callers see it.
   if (automating) return;
   automating = true;
+  // A live claim supersedes any deferred retry of a stale target.
+  pendingColorMode = null;
+  if (visibilityRetryTimer != null) {
+    clearTimeout(visibilityRetryTimer);
+    visibilityRetryTimer = null;
+  }
+  if (visibilityRetryArmed) {
+    document.removeEventListener("visibilitychange", onVisibilityRetry);
+    visibilityRetryArmed = false;
+  }
   let succeeded = false;
+  let hiddenDuringRun = document.hidden;
+  const noteHidden = () => {
+    if (document.hidden) hiddenDuringRun = true;
+  };
+  document.addEventListener("visibilitychange", noteHidden);
 
   // No cache check. The "Dark already selected" / "Light already selected"
   // detection inside clickColorModeButton (via `boxContainerSelected` class)
@@ -1815,6 +1849,8 @@ async function ensureSlackColorMode(targetIsDark) {
       setTimeout(removeHideStyle, 300);
     }
   } finally {
+    document.removeEventListener("visibilitychange", noteHidden);
+
     // Safety net: never leave Preferences on screen. Every failure path above
     // tries to close, but a tab that goes hidden MID-flight throttles the
     // remaining awaits, so the flow can unwind with the modal still up — the
@@ -1825,18 +1861,32 @@ async function ensureSlackColorMode(targetIsDark) {
       await closeDialog();
     }
 
-    // If we failed because the tab went hidden underneath us, re-arm rather
-    // than leaving Slack on the wrong color mode until the next theme change.
-    if (!succeeded && document.hidden) armVisibilityRetry(targetIsDark);
+    // Re-arm if we failed because the tab went hidden at any point — not just
+    // if it's still hidden now. A hide-then-return before this line used to
+    // skip the retry and leave Slack on the wrong Color Mode. Don't overwrite
+    // a newer target parked while we were in flight; fall back to the engine's
+    // current polarity so we don't revive a stale in-flight argument.
+    if (!succeeded && hiddenDuringRun) {
+      const retry =
+        pendingColorMode !== null
+          ? pendingColorMode
+          : (OmarchyTheme.current && OmarchyTheme.current.surfaces
+              ? OmarchyTheme.current.surfaces.isDark
+              : targetIsDark);
+      armVisibilityRetry(retry);
+    }
 
     // Close any leftover workspace menu — Slack's "close menu on item click"
     // handler doesn't fire reliably for synthetic clicks, so it stays open
-    // after we click "Preferences".
-    for (let i = 0; i < 4; i++) {
-      const lingering = document.querySelector('[role="menu"][data-qa="menu_items"]');
-      if (!lingering) break;
-      pressKey({ key: "Escape", code: "Escape", keyCode: 27, which: 27 });
-      await sleep(150);
+    // after we click "Preferences". Skip the timed loop while hidden: those
+    // sleeps would hold the automating lock the deferred retry is waiting on.
+    if (!document.hidden) {
+      for (let i = 0; i < 4; i++) {
+        const lingering = document.querySelector('[role="menu"][data-qa="menu_items"]');
+        if (!lingering) break;
+        pressKey({ key: "Escape", code: "Escape", keyCode: 27, which: 27 });
+        await sleep(150);
+      }
     }
 
     // Hold the lock for a beat after we finish so any in-flight theme
