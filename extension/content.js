@@ -1680,13 +1680,8 @@ async function clickColorModeButton(_modal, target) {
   return false;
 }
 
-async function closeDialog() {
-  // Try Escape first
-  pressKey({ key: "Escape", code: "Escape", keyCode: 27, which: 27 });
-  if (await waitFor(() => !findPrefsDialog(), 800)) return;
-
-  // Escape didn't close it (likely a trusted-event issue) — click the X.
-  const closeBtn =
+function findCloseButton() {
+  return (
     document.querySelector(
       '[aria-label="Preferences"] [aria-label*="Close" i]'
     ) ||
@@ -1698,7 +1693,31 @@ async function closeDialog() {
     ) ||
     document.querySelector(
       '.p-prefs_dialog button[aria-label="Close"], .p-prefs_dialog__close'
-    );
+    )
+  );
+}
+
+async function closeDialog() {
+  // Hidden tab: every wait below is throttled to roughly one poll a minute, so
+  // verifying here would block the caller (and hold the automating lock) for
+  // minutes. Fire both closers synchronously and leave it at that — the
+  // deferred retry re-runs this whole flow once the tab is visible.
+  if (document.hidden) {
+    pressKey({ key: "Escape", code: "Escape", keyCode: 27, which: 27 });
+    const btn = findCloseButton();
+    if (btn) {
+      dispatchClick(btn);
+      try { btn.click(); } catch (_) {}
+    }
+    return;
+  }
+
+  // Try Escape first
+  pressKey({ key: "Escape", code: "Escape", keyCode: 27, which: 27 });
+  if (await waitFor(() => !findPrefsDialog(), 800)) return;
+
+  // Escape didn't close it (likely a trusted-event issue) — click the X.
+  const closeBtn = findCloseButton();
 
   if (closeBtn) {
     console.log("[omarchy] closing prefs via close button");
@@ -1799,7 +1818,8 @@ async function ensureSlackColorMode(targetIsDark) {
     // Safety net: never leave Preferences on screen. Every failure path above
     // tries to close, but a tab that goes hidden MID-flight throttles the
     // remaining awaits, so the flow can unwind with the modal still up — the
-    // most visible failure mode there is.
+    // most visible failure mode there is. (closeDialog() has its own hidden-tab
+    // fast path, so this can't stall the unlock scheduled below.)
     if (findPrefsDialog()) {
       console.warn("[omarchy] preferences still open on exit; forcing close");
       await closeDialog();
