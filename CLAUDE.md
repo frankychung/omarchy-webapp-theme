@@ -10,8 +10,9 @@ app-agnostic **engine** + one **pack per site**: Slack (`content.js`, the full
 pack — repaints chrome/sidebar/message pane and auto-flips Slack's Light/Dark
 Color Mode), WhatsApp Web (`whatsapp.js`, declarative), GitHub (`github.js`,
 declarative Primer tokens), Linear (`linear.js`), Discord (`discord.js`),
-Outlook Web (`outlook.js`, Fluent v9 tokens), and Notion (`notion.js`,
-`--c-`/`--ca-` tokens + a Prism syntax palette). A **bash
+Outlook Web (`outlook.js`, Fluent v9 tokens), Notion (`notion.js`,
+`--c-`/`--ca-` tokens + a Prism syntax palette), and HEY email + calendar
+(`hey.js`, one pack for both). A **bash
 native-messaging host** reads the active Omarchy theme from
 `~/.local/state/omarchy/current/` and pushes theme changes to the extension
 the moment they land. **Requires Omarchy 4+.**
@@ -132,6 +133,66 @@ script.
     `prefers-color-scheme` listener, which the MAIN-world shim drives. Matches
     `app.notion.com` (the live app host) plus `notion.so`, which now only
     redirects there.
+  - `hey.js` — **the HEY pack**, covering HEY email AND HEY Calendar: they are one
+    Rails app at `app.hey.com` sharing one token system, so one pack themes both.
+    Verified live 2026-08-18. The friendliest target in this repo: **9 of 948
+    elements carry a style attribute, only one is colour-valued, and there is not
+    a single inline `!important`** — none of the inline-painting or observer
+    machinery Slack and Outlook need.
+    **TWO LAYERS WITH DIFFERENT FORMATS — the one real trap.** `--rgb-*` hold bare
+    `r, g, b` TRIPLETS composited at the point of use (`rgba(var(--rgb-ink), .15)`,
+    193 such consumptions) while `--color-*` hold REAL COLOURS, and 78% of the
+    `--color-*` layer is *built from* the `--rgb-*` layer. Write `--rgb-*` through
+    `toTriplet()`; feeding a colour in yields `rgba(#7aa2f7, .15)`, invalid at
+    computed-value time. The pack sets BOTH layers explicitly anyway: ~19
+    `--color-*` tokens are hardcoded literals deriving from nothing
+    (`--color-bg--surface-solid: #f3f1ef`), and others are built per-mode from
+    `--rgb-almost-black` / `--rgb-almost-white` rather than the `--rgb-ink` alias,
+    so they'd keep HEY's purple-tinted greys.
+    **Light/dark needs no automation and no user setting**, unlike Notion. HEY's
+    own comment says it: `/* Hey World doesn't use JS, so we need to rely on CSS
+    media queries */`. The app reads matchMedia in JS and stamps
+    `data-color-scheme` on `<html>` — which the shim drives — and the
+    `@media (prefers-color-scheme: dark)` arm is only a no-JS fallback, guarded by
+    `:not([data-color-scheme="light"])`, so the reverse direction is safe too.
+    **NEVER REMAP THE EMAIL PAPER FAMILY**: `--color-bg--message-content` (`#fff`,
+    and notably IDENTICAL in light and dark) plus `--color-txt--on-message-content`
+    and friends. Unlike Outlook, HEY does NOT transform received mail for dark
+    mode — it renders the sender's HTML as authored on a white sheet, which is why
+    it keeps that sheet white in both modes with permanently dark ink. Retinting
+    it gives black text on a black background. (The body is in an iframe anyway,
+    which `all_frames: false` keeps us out of.) Same for `--color-bg--note-opaque`
+    (the sticky-note paper) and HEY's honestly-named `always` family
+    (`--color-always-white`, `--color-always-black`, `--rgb-always-blue`) — better
+    self-documentation than Outlook's misleading `--white`.
+    Its small `apply()` hook exists for one thing tokens can't express: HEY pairs
+    an ACCENT FILL with permanently-dark ink —
+    `.btn--primary { background: var(--color-primary); color: var(--color-almost-black) }`
+    — which works for HEY's light mint/amber brand but makes the label unreadable
+    on a DARK accent (catppuccin-latte, lupine). It can't be fixed by remapping
+    `--color-almost-black`, whose other consumers genuinely want "always dark" (the
+    dark-mode sheet box-shadow, the calendar day dividers, the print stylesheet),
+    so it's scoped by selector. HEY's class names are hand-written and stable, not
+    hashed, so a class selector is honest here. Their declaration is a NORMAL one
+    inside `@layer components` and an unlayered `!important` beats it; their few
+    LAYERED `!important` rules (`.btn--reversed`, `.spinner__dot`) would outrank an
+    unlayered one but resolve through tokens `cssVars` already themes. The hook
+    also flips the button's leading glyph, which is the one tractable corner of the
+    `--colorize-*` family — no filter solving needed, just a choice between the two
+    values HEY ships (`none` / `invert(100%)`).
+    **The entire `--colorize-*` family (30 tokens) is deliberately unmapped**:
+    they are not colours but CSS `filter` chains that recolour monochrome icon
+    assets. Hitting an arbitrary hex needs a numerical solver over five filter
+    functions, and it isn't needed for correctness — HEY swaps the whole set by
+    mode, so icons are already the right POLARITY, just not hue-matched.
+    `--color-tertiary` gets a **theme-coherent** fallback rather than a status
+    one: it's decorative (the calendar's Day/Week/Year switch and its
+    `linear-gradient(135deg, var(--color-secondary), var(--color-tertiary))`), so
+    where `statusPalette` rightly declines to invent a hue, importing HEY's purple
+    made it the most off-theme thing on the page. It now falls through the magenta
+    family → the palette colour farthest from every already-taken role → the
+    accent. The distance scan is explicit because `highlightColor()` avoids only
+    ONE colour and kept handing back the colour already used for `negative`.
   - `background.js` — MV3 service worker. Holds the native-messaging port,
     rebroadcasts pushed themes to matched tabs (the site list is derived from
     the manifest's content-script matches — adding a pack never touches this

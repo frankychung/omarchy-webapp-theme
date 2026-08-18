@@ -12,6 +12,7 @@ const SITES = [
   { id: "discord", label: "Discord", host: "discord.com" },
   { id: "outlook", label: "Outlook", host: "outlook.office.com" },
   { id: "notion", label: "Notion", host: "app.notion.com" },
+  { id: "hey", label: "HEY + Calendar", host: "app.hey.com" },
 ];
 
 const container = document.getElementById("sites");

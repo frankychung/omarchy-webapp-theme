@@ -13,8 +13,8 @@ post_install() {
       pkill brave    # or chromium / google-chrome-stable
 
   Open app.slack.com, web.whatsapp.com, github.com, linear.app, discord.com,
-  outlook.office.com or app.notion.com and switch omarchy themes; they should
-  follow.
+  outlook.office.com, app.notion.com or app.hey.com and switch omarchy themes;
+  they should follow.
 
 EOF
 }
