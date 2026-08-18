@@ -94,6 +94,40 @@ function alphaForContrast(ink, surfaces, target, floorAlpha) {
   return 1;
 }
 
+// Pick the ink for text/icons that ride on a SATURATED FILL (an accent button,
+// a badge, a selected chip). The conventional answer is the page background —
+// dark ink on a light accent, light ink on a dark one — and on most palettes
+// that's both legible and the most theme-coherent choice. But it is only a
+// convention, not a guarantee: an accent that sits in the MIDDLE of the range
+// contrasts poorly with the page AND with the foreground. Measured across the 22
+// shipped themes, three land there — rose-pine (accent #56949f on page #faf4ed:
+// 3.14:1), miasma (#78824b: 3.86:1) and catppuccin-latte (#1e66f5: 4.34:1) — all
+// under the AA 4.5:1 floor for the button LABELS this ink is spent on.
+//
+// So try the theme's own colors first, in the caller's order of preference, and
+// only escalate to plain white/black when neither reads. Escalating costs some
+// theme coherence on those three palettes; not escalating costs legibility on
+// the one control the user is most likely to click. Returns the best candidate
+// available when nothing clears the target, so the caller always gets a color.
+function inkOn(fill, candidates, target) {
+  const want = target == null ? 4.5 : target;
+  const list = (Array.isArray(candidates) ? candidates : [candidates]).filter(Boolean);
+  for (const ink of list) {
+    if (contrastRatio(ink, fill) >= want) return ink;
+  }
+  const all = list.concat(["#ffffff", "#000000"]);
+  let best = all[0];
+  let bestRatio = -1;
+  for (const ink of all) {
+    const r = contrastRatio(ink, fill);
+    if (r > bestRatio) {
+      bestRatio = r;
+      best = ink;
+    }
+  }
+  return best;
+}
+
 // Emit "r, g, b" — a bare channel list, NOT a color. Some design systems (see
 // Slack's --sk_* tokens) hold their palette as triplets and composite at the
 // point of use: `color: rgba(var(--sk_primary_foreground), .7)`. Feeding a real

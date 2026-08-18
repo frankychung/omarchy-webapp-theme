@@ -9,8 +9,9 @@ web apps follow the current [Omarchy](https://omarchy.org/) theme. One
 app-agnostic **engine** + one **pack per site**: Slack (`content.js`, the full
 pack — repaints chrome/sidebar/message pane and auto-flips Slack's Light/Dark
 Color Mode), WhatsApp Web (`whatsapp.js`, declarative), GitHub (`github.js`,
-declarative Primer tokens), Linear (`linear.js`), Discord (`discord.js`), and
-Outlook Web (`outlook.js`, Fluent v9 tokens). A **bash
+declarative Primer tokens), Linear (`linear.js`), Discord (`discord.js`),
+Outlook Web (`outlook.js`, Fluent v9 tokens), and Notion (`notion.js`,
+`--c-`/`--ca-` tokens + a Prism syntax palette). A **bash
 native-messaging host** reads the active Omarchy theme from
 `~/.local/state/omarchy/current/` and pushes theme changes to the extension
 the moment they land. **Requires Omarchy 4+.**
@@ -25,7 +26,8 @@ script.
   - `omarchy-colors.js` / `omarchy-surfaces.js` / `omarchy-runtime.js` — the
     app-agnostic engine (loaded before `content.js`, shares its scope): color
     helpers (`relLuminance` linearizes channels per WCAG, `contrastRatio`,
-    `alphaForContrast`, `toTriplet` for triplet-valued design tokens),
+    `alphaForContrast`, `inkOn` for ink that rides on a saturated fill,
+    `toTriplet` for triplet-valued design tokens),
     `deriveSurfaces()` (the theme→surfaces contract), and the `OmarchyTheme`
     registry that receives themes and dispatches to the registered pack.
     `sidebarMuted` is **contrast-targeted, not a fixed fraction of `fg`**: its
@@ -86,6 +88,50 @@ script.
     mailbox (2026-08-04). **Never remap `--white`/`--black`** — they're literal
     colors for icon fills and text on brand buttons; repointing them inverts
     contrast. Outlook follows the system light/dark on its own.
+  - `notion.js` — **the Notion pack**: maps Notion's `--c-*` (opaque) and
+    `--ca-*` (alpha wash) families, plus the two legacy `--cl-*` / `--cd-*` sets,
+    to the derived surfaces. Verified against the live app (2026-08-18). Notion's
+    names are abbreviated but regular — `Bac`/`Tex`/`Ico`/`Bor` x
+    `Pri`/`Sec`/`Ter`/`Ele`/`Int`/`Str`/`Acc`/`Inv`/`Dis` — which is what makes a
+    declarative table practical across ~1,300 tokens.
+    Three measurements make this pack far simpler than it first looks:
+    **(1)** Notion paints from INLINE styles that merely *consume* the tokens
+    (`background: var(--c-bacPri)`), so the engine's inline-important redefinition
+    of the property still wins — nothing has to beat an inline `background`.
+    **(2)** A StyleX layer sits in between (`--x-umghl: var(--ca-bacIntTra)`), but
+    unlike Linear's `--sx-*` slots these hold no literal colours: of 781 slot
+    declarations on a loaded page, every colour-valued one resolves to a semantic
+    token and the only literal is `transparent`. So no hash classification and no
+    rAF repaint path.
+    **(3)** Zero triplet consumption — `rgb(var(--x))` appears nowhere in Notion's
+    CSS or its inline styles, so every token takes a real colour.
+    Its `apply()` hook exists for the two things tokens cannot reach. First,
+    Notion's **boot stylesheet**, which hardcodes `body{background:#191919}` plus
+    the whole pre-hydration skeleton as literals — so `body` (and therefore the
+    viewport canvas behind an overscroll) kept Notion's grey for the entire
+    session, and every load flashed it. Second, **Prism syntax highlighting**,
+    which ships as class-scoped literals in two mode-specific sets. The syntax
+    palette is drawn from the theme's terminal colours — a terminal palette IS a
+    syntax palette — with a chroma floor and a 3.5:1 contrast floor per role,
+    falling back to `fg` so monochrome themes (`white`, `vantablack`) get
+    uncoloured code rather than an invented rainbow.
+    **Inline code** is handled separately, and deliberately NOT by remapping
+    `--c-redTexSec`: that token is also what a user's genuinely red TEXT resolves
+    to. Inline code is matched instead by the one thing unique to it — an
+    attribute-substring match on Notion's monospace stack,
+    `span[style*="SFMono-Regular"]`. Code BLOCK spans carry no inline
+    font-family (the block sets it on a container), so they are unaffected.
+    **Never remap** the nine chromatic block-colour families (`--c-blu*`,
+    `--c-red*`, …): a red callout is an authoring choice, the same line
+    `outlook.js` draws around a sender's design. The neutral `gra` family IS
+    mapped — including its easily-missed **alpha arm** (`--ca-gra*Tra`), which
+    paints the block drag-handle grips beside every paragraph. Scrims
+    (`--ca-modUndBac`, `--ca-oveSmo`) stay dark by design.
+    **Requires Notion's appearance set to "Use system setting"** (Settings → My
+    settings → Appearance): Notion flips its `notion-dark-theme` body class from a
+    `prefers-color-scheme` listener, which the MAIN-world shim drives. Matches
+    `app.notion.com` (the live app host) plus `notion.so`, which now only
+    redirects there.
   - `background.js` — MV3 service worker. Holds the native-messaging port,
     rebroadcasts pushed themes to matched tabs (the site list is derived from
     the manifest's content-script matches — adding a pack never touches this

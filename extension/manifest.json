@@ -25,7 +25,10 @@
     "*://outlook.office.com/*",
     "*://outlook.office365.com/*",
     "*://outlook.live.com/*",
-    "*://outlook.cloud.microsoft/*"
+    "*://outlook.cloud.microsoft/*",
+    "*://app.notion.com/*",
+    "*://www.notion.so/*",
+    "*://notion.so/*"
   ],
   "background": {
     "service_worker": "background.js"
@@ -43,7 +46,10 @@
         "*://outlook.office.com/*",
         "*://outlook.office365.com/*",
         "*://outlook.live.com/*",
-        "*://outlook.cloud.microsoft/*"
+        "*://outlook.cloud.microsoft/*",
+        "*://app.notion.com/*",
+        "*://www.notion.so/*",
+        "*://notion.so/*"
       ],
       "js": [
         "inject-prefers-color-scheme.js"
@@ -64,7 +70,10 @@
         "*://outlook.office.com/*",
         "*://outlook.office365.com/*",
         "*://outlook.live.com/*",
-        "*://outlook.cloud.microsoft/*"
+        "*://outlook.cloud.microsoft/*",
+        "*://app.notion.com/*",
+        "*://www.notion.so/*",
+        "*://notion.so/*"
       ],
       "js": [
         "omarchy-colors.js",
@@ -135,6 +144,18 @@
       ],
       "js": [
         "outlook.js"
+      ],
+      "run_at": "document_start",
+      "all_frames": false
+    },
+    {
+      "matches": [
+        "*://app.notion.com/*",
+        "*://www.notion.so/*",
+        "*://notion.so/*"
+      ],
+      "js": [
+        "notion.js"
       ],
       "run_at": "document_start",
       "all_frames": false
