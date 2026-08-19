@@ -23,7 +23,7 @@ Installs the native-messaging host to `/usr/bin`, the extension and hook to
 
 Those paths came from the shipped binaries' compiled-in search list, not from
 docs. Brave reading Chromium's directory is why two files replace the
-nine-directory per-user fan-out that `install.sh` does in a git checkout.
+twelve-directory per-user fan-out that `install.sh` does in a git checkout.
 
 Everything else lives under `$HOME` and so can't come from a package — the
 omarchy `theme-set` hook and the browser `--load-extension` flag. Those are the

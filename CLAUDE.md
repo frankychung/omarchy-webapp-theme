@@ -226,10 +226,14 @@ script.
 - `hooks/omarchy-webapp-theme` — omarchy `theme-set` hook. Signals SIGUSR1 to
   every running host via pidfiles in `$XDG_RUNTIME_DIR/omarchy-webapp-theme/`.
 - `install.sh` — takes no extension ID. Refuses on pre-Omarchy-4 (no
-  `~/.local/state/omarchy/current`). Otherwise writes host manifests to all nine
-  Chromium-family profile dirs, symlinks the hook into `hooks/theme-set.d/`, and
+  `~/.local/state/omarchy/current`). Otherwise writes host manifests to every
+  Chromium-family profile dir, symlinks the hook into `hooks/theme-set.d/`, and
   adds `--load-extension` to the flags confs of installed browsers. `--no-flags`,
-  `--uninstall`.
+  `--uninstall`. **Brave Origin is a separate browser, not a Brave channel** —
+  its own package (`brave-origin-bin`), binary, `brave-origin-flags.conf`, and
+  `BraveSoftware/Brave-Origin` profile root; all three of its channels are in
+  both lists. It reads system-wide hosts from `/etc/chromium` and
+  `/etc/opt/chrome`, so a *packaged* install needs no per-user manifest there.
 
 ## Adding a site pack
 

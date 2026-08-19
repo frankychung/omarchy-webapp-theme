@@ -96,17 +96,26 @@ BROWSER_PROFILE_DIRS=(
   "$HOME/.config/BraveSoftware/Brave-Browser"
   "$HOME/.config/BraveSoftware/Brave-Browser-Beta"
   "$HOME/.config/BraveSoftware/Brave-Browser-Nightly"
+  # Brave Origin is a separate browser, not a Brave channel: its own package
+  # (brave-origin-bin), binary, flags conf and profile root. Verified against the
+  # stable binary, which stores under BraveSoftware/Brave-Origin and reads
+  # system-wide hosts from /etc/chromium and /etc/opt/chrome; beta/nightly follow
+  # the same -Beta/-Nightly suffix convention as Brave-Browser.
+  "$HOME/.config/BraveSoftware/Brave-Origin"
+  "$HOME/.config/BraveSoftware/Brave-Origin-Beta"
+  "$HOME/.config/BraveSoftware/Brave-Origin-Nightly"
   "$HOME/.config/microsoft-edge"
   "$HOME/.config/microsoft-edge-dev"
 )
 
 # Arch's browser launchers read ~/.config/<name>-flags.conf. The conf name doesn't
 # map 1:1 onto profile dirs, so this is a separate list — the same one omarchy's
-# yt-dlp migration uses, paired with the binaries that prove the browser exists.
+# yt-dlp migration uses (plus Brave Origin's beta/nightly channels), paired with
+# the binaries that prove the browser exists.
 #
 # Detect by BINARY, not profile dir: omarchy's own chromium-extension installers
-# mkdir all nine profile dirs on every machine, so "the dir exists" would be true
-# for browsers you've never installed and we'd litter confs for all of them.
+# mkdir every Chromium profile dir on every machine, so "the dir exists" would be
+# true for browsers you've never installed and we'd litter confs for all of them.
 FLAGS_TARGETS=(
   "chromium:chromium"
   "chrome:google-chrome-stable google-chrome"
@@ -114,7 +123,9 @@ FLAGS_TARGETS=(
   "brave:brave brave-browser"
   "brave-beta:brave-beta brave-browser-beta"
   "brave-nightly:brave-nightly brave-browser-nightly"
+  "brave-origin:brave-origin"
   "brave-origin-beta:brave-origin-beta"
+  "brave-origin-nightly:brave-origin-nightly"
   "microsoft-edge-stable:microsoft-edge-stable microsoft-edge"
 )
 
