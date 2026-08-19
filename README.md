@@ -1,7 +1,7 @@
 # omarchy-webapp-theme
 
 A tiny browser extension that makes web apps — **Slack, WhatsApp Web, GitHub,
-Linear, Discord, and Outlook** — follow your [Omarchy](https://omarchy.org/)
+Linear, Discord, Outlook, Notion, and HEY** — follow your [Omarchy](https://omarchy.org/)
 theme: painting their surfaces with your terminal's palette and flipping their
 Light/Dark mode whenever you switch omarchy themes, so they visually blend into
 the rest of your desktop.
@@ -27,8 +27,10 @@ and Edge.
 - **Not just Slack**: the extension is a theme engine plus one small "pack" per
   site. WhatsApp Web (surfaces, bubbles, unread badges, and even default
   avatars recolored from your terminal palette), GitHub (Primer design tokens),
-  Linear (sidebar + elevation ladder), Discord, and Outlook Web (Fluent v9
-  tokens) ship too — adding another site is one pack file + one manifest entry.
+  Linear (sidebar + elevation ladder), Discord, Outlook Web (Fluent v9
+  tokens), Notion (surfaces, body copy, and code-block syntax highlighting
+  drawn from your terminal palette), and HEY (email + calendar in one pack) ship
+  too — adding another site is one pack file + one manifest entry.
 
 https://github.com/user-attachments/assets/83787af6-7c41-4449-9460-c7f67b21aa5b
 
@@ -98,8 +100,20 @@ because both live under `$HOME`. It takes the same `--no-flags` and
 from `omarchy-slack-theme`? The setup cleans up the old name's wiring too.)
 
 Then fully quit your browser and open any supported site — `app.slack.com`,
-`web.whatsapp.com`, `github.com`, `linear.app`, `discord.com`, or
-`outlook.office.com`.
+`web.whatsapp.com`, `github.com`, `linear.app`, `discord.com`,
+`outlook.office.com`, `app.notion.com`, or `app.hey.com`.
+
+On HEY, one pack covers both email and HEY Calendar (they are one app). HEY
+follows the system light/dark on its own, so there is nothing to configure.
+Received email keeps its white sheet and dark ink on purpose — HEY renders the
+sender's HTML as authored rather than transforming it for dark mode, so
+retinting that sheet would leave black text on a black background.
+
+On Notion, set Settings → My settings → Appearance to **"Use system setting"**.
+Notion picks its Light/Dark theme from a `prefers-color-scheme` listener, which
+the extension drives; pinned to Light or Dark it stops following your omarchy
+theme. Notion's own block colours (a red callout, blue text) are left alone —
+those are authoring choices, not chrome.
 
 On GitHub, only the app is themed. The marketing site (`/features/*`, `/pricing`,
 `/resources/*`, `/open-source`, and the signed-out homepage) is left as GitHub
@@ -210,6 +224,8 @@ extension/
 ├── linear.js                       # the Linear pack: semantic CSS-var table
 ├── discord.js                      # the Discord pack: declarative CSS-var table
 ├── outlook.js                      # the Outlook pack: Fluent v9 CSS-var table
+├── notion.js                       # the Notion pack: --c-/--ca- tokens + Prism syntax
+├── hey.js                          # the HEY pack (email + calendar): --rgb-/--color- tokens
 └── inject-prefers-color-scheme.js  # MAIN-world: matchMedia polyfill + React-click bridge
 
 native-host/
