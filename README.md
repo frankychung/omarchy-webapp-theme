@@ -6,8 +6,8 @@ theme: painting their surfaces with your terminal's palette and flipping their
 Light/Dark mode whenever you switch omarchy themes, so they visually blend into
 the rest of your desktop.
 
-Built and tested on Brave on Arch Linux + Omarchy. Works on Chrome, Chromium,
-and Edge.
+Built and tested on Brave on Arch Linux + Omarchy. Works on Brave Origin,
+Chrome, Chromium, and Edge.
 
 > Known as `omarchy-slack-theme` through 0.2.x, back when Slack was the only
 > pack.
@@ -76,7 +76,7 @@ background — robust to themes that don't use the obvious day/night naming
 
 ## Requirements
 
-- Brave, Chrome, Chromium, or Edge — Manifest V3
+- Brave, Brave Origin, Chrome, Chromium, or Edge — Manifest V3
 - Bash + coreutils. No Python, no runtime dependencies.
 - Linux + [Omarchy](https://omarchy.org/) **4+** — the host reads
   `~/.local/state/omarchy/current/` and is driven by the `theme-set.d` hook.
@@ -133,8 +133,8 @@ There's no extension ID to copy. `extension/manifest.json` pins the ID with a
 
 The script does three things:
 
-1. Registers the native-messaging host in all nine Chromium-family profile dirs
-   (Chromium, Chrome ×3, Brave ×3, Edge ×2).
+1. Registers the native-messaging host in every Chromium-family profile dir
+   (Chromium, Chrome ×3, Brave ×3, Brave Origin ×3, Edge ×2).
 2. Symlinks the omarchy `theme-set` hook into `hooks/theme-set.d/` (your own
    hooks there are left alone).
 3. Adds `--load-extension` to the flags files of the browsers you actually have
