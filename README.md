@@ -32,7 +32,7 @@ Chrome, Chromium, and Edge.
   drawn from your terminal palette), and HEY (email + calendar in one pack) ship
   too — adding another site is one pack file + one manifest entry.
 
-https://github.com/user-attachments/assets/83787af6-7c41-4449-9460-c7f67b21aa5b
+https://github.com/user-attachments/assets/5c67741e-c6df-4f48-8c1a-72eadcc805bb
 
 ## How it works
 
@@ -103,23 +103,8 @@ Then fully quit your browser and open any supported site — `app.slack.com`,
 `web.whatsapp.com`, `github.com`, `linear.app`, `discord.com`,
 `outlook.office.com`, `app.notion.com`, or `app.hey.com`.
 
-On HEY, one pack covers both email and HEY Calendar (they are one app). HEY
-follows the system light/dark on its own, so there is nothing to configure.
-Received email keeps its white sheet and dark ink on purpose — HEY renders the
-sender's HTML as authored rather than transforming it for dark mode, so
-retinting that sheet would leave black text on a black background.
-
-On Notion, set Settings → My settings → Appearance to **"Use system setting"**.
-Notion picks its Light/Dark theme from a `prefers-color-scheme` listener, which
-the extension drives; pinned to Light or Dark it stops following your omarchy
-theme. Notion's own block colours (a red callout, blue text) are left alone —
-those are authoring choices, not chrome.
-
-On GitHub, only the app is themed. The marketing site (`/features/*`, `/pricing`,
-`/resources/*`, `/open-source`, and the signed-out homepage) is left as GitHub
-ships it — those pages deliberately alternate dark and light hero sections, so
-repainting them onto a single terminal background flattens the design instead of
-theming it.
+Then see **[Per-site setup](#per-site-setup)** for the appearance setting a
+few apps need, and for the extension options that turn theming off per site.
 
 ### From a git checkout
 
@@ -141,7 +126,7 @@ The script does three things:
    installed, so the extension loads without Developer mode.
 
 Then **fully quit your browser** (`pkill brave` — closing the window isn't
-enough) and open `app.slack.com`.
+enough) and open a supported site.
 
 > **Upgrading from a manual install?** Remove the copy you loaded via
 > **Load unpacked** first. It shares the now-pinned ID with the
@@ -153,6 +138,40 @@ Options:
 | --- | --- |
 | `--no-flags` | Skip the flags-file edits; load `extension/` by hand instead. |
 | `--uninstall` | Reverse all three steps. |
+
+## Per-site setup
+
+Most packs follow your omarchy theme as soon as you open the site. A few apps
+have their own Light/Dark setting, and while that's pinned they ignore the
+extension — the palette changes, the polarity doesn't. Put those on "system":
+
+| Site | Setting | Where |
+| --- | --- | --- |
+| WhatsApp Web | **System default** | Settings → Theme |
+| GitHub | **Sync with system** | Settings → Appearance → Theme |
+| Linear | **System preference** | `Ctrl+K` → "Change interface theme" (per-device) |
+| Discord | **Sync with computer** (Discord's "Auto") | Settings → Appearance → Theme |
+| Notion | **Use system setting** | Settings → My settings → Appearance |
+
+Slack, Outlook, and HEY need nothing: Slack's Appearance radio is flipped
+automatically, and Outlook/HEY already follow the system.
+
+**To stop theming a site entirely**, right-click the extension's toolbar icon
+and choose **Options**, or open `chrome://extensions` /
+`brave://extensions` → the extension → **Details** → **Extension options**.
+Uncheck any site you want left as it ships. All sites start enabled.
+
+A few packs also leave things deliberately untouched:
+
+- **Notion** — block colours (a red callout, blue text) are authoring choices,
+  not chrome, so they keep their own hues.
+- **GitHub** — only the app is themed. The marketing site (`/features/*`,
+  `/pricing`, `/resources/*`, `/open-source`, and the signed-out homepage) is
+  left as GitHub ships it: those pages mix dark and light heroes, so one
+  terminal background would flatten them.
+- **HEY** — one pack covers both email and Calendar. Received mail keeps its
+  white sheet and dark ink on purpose: HEY renders the sender's HTML as
+  authored rather than transforming it for dark mode.
 
 ## Verifying it works
 
@@ -206,8 +225,6 @@ Slack tab.
   the real workhorse; the keyboard attempt is best-effort.
 - **Only one workspace at a time has been tested.** Multi-workspace setups
   should work since the selectors are workspace-agnostic, but PRs welcome.
-- **No popup UI, no options page.** This is intentional — the extension has
-  no user-facing controls, just a content script and a service worker.
 
 ## Repository layout
 
