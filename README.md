@@ -32,7 +32,7 @@ Chrome, Chromium, and Edge.
   drawn from your terminal palette), and HEY (email + calendar in one pack) ship
   too — adding another site is one pack file + one manifest entry.
 
-https://github.com/user-attachments/assets/83787af6-7c41-4449-9460-c7f67b21aa5b
+https://github.com/user-attachments/assets/5c67741e-c6df-4f48-8c1a-72eadcc805bb
 
 ## How it works
 
