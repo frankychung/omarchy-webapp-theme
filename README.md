@@ -103,8 +103,8 @@ Then fully quit your browser and open any supported site — `app.slack.com`,
 `web.whatsapp.com`, `github.com`, `linear.app`, `discord.com`,
 `outlook.office.com`, `app.notion.com`, or `app.hey.com`.
 
-Then see **[Per-site setup](#per-site-setup)** — a few apps need their own
-appearance setting put on "system" before they will follow your theme.
+Then see **[Per-site setup](#per-site-setup)** for the appearance setting a
+few apps need, and for the extension options that turn theming off per site.
 
 ### From a git checkout
 
@@ -126,7 +126,7 @@ The script does three things:
    installed, so the extension loads without Developer mode.
 
 Then **fully quit your browser** (`pkill brave` — closing the window isn't
-enough) and open `app.slack.com`.
+enough) and open a supported site.
 
 > **Upgrading from a manual install?** Remove the copy you loaded via
 > **Load unpacked** first. It shares the now-pinned ID with the
@@ -141,26 +141,25 @@ Options:
 
 ## Per-site setup
 
-The packs repaint colours by themselves, but **light/dark is the app's own
-setting**, and every app that can be pinned to Light or Dark will ignore your
-omarchy theme while it is. The symptom is specific: the palette changes, the
-polarity doesn't. If a site stays dark when you switch to a light theme, check
-this table first.
+Most packs follow your omarchy theme as soon as you open the site. A few apps
+have their own Light/Dark setting, and while that's pinned they ignore the
+extension — the palette changes, the polarity doesn't. Put those on "system":
 
-| Site | Light/dark setting | Where |
+| Site | Setting | Where |
 | --- | --- | --- |
-| Slack | *nothing to set* | The pack drives Slack's Appearance radio itself — this build ships no "Sync with OS" option. |
 | WhatsApp Web | **System default** | Settings → Theme |
 | GitHub | **Sync with system** | Settings → Appearance → Theme |
-| Linear | **System preference** | `Ctrl+K` → "Change interface theme" — per-device, so set it on each machine |
-| Discord | **Sync with computer** (the "Auto" option) | Settings → Appearance → Theme |
-| Outlook Web | *nothing to set* | Follows the system preference on its own. |
+| Linear | **System preference** | `Ctrl+K` → "Change interface theme" (per-device) |
+| Discord | **Sync with computer** (Discord's "Auto") | Settings → Appearance → Theme |
 | Notion | **Use system setting** | Settings → My settings → Appearance |
-| HEY | *nothing to set* | Follows the system preference on its own. |
 
-The mechanism behind the table: these apps pick their mode from a
-`prefers-color-scheme` listener, and the extension drives that listener from your
-omarchy theme. Pinned to Light or Dark, the app never consults it.
+Slack, Outlook, and HEY need nothing: Slack's Appearance radio is flipped
+automatically, and Outlook/HEY already follow the system.
+
+**To stop theming a site entirely**, right-click the extension's toolbar icon
+and choose **Options**, or open `chrome://extensions` /
+`brave://extensions` → the extension → **Details** → **Extension options**.
+Uncheck any site you want left as it ships. All sites start enabled.
 
 A few packs also leave things deliberately untouched:
 
@@ -168,13 +167,11 @@ A few packs also leave things deliberately untouched:
   not chrome, so they keep their own hues.
 - **GitHub** — only the app is themed. The marketing site (`/features/*`,
   `/pricing`, `/resources/*`, `/open-source`, and the signed-out homepage) is
-  left as GitHub ships it: those pages deliberately alternate dark and light
-  hero sections, so repainting them onto one terminal background flattens the
-  design instead of theming it.
-- **HEY** — one pack covers both email and HEY Calendar (they are one app).
-  Received email keeps its white sheet and dark ink on purpose: HEY renders the
-  sender's HTML as authored rather than transforming it for dark mode, so
-  retinting that sheet would leave black text on a black background.
+  left as GitHub ships it: those pages mix dark and light heroes, so one
+  terminal background would flatten them.
+- **HEY** — one pack covers both email and Calendar. Received mail keeps its
+  white sheet and dark ink on purpose: HEY renders the sender's HTML as
+  authored rather than transforming it for dark mode.
 
 ## Verifying it works
 
@@ -198,25 +195,6 @@ successful theme switch looks like:
 ```
 
 ## Customization
-
-### Turning theming off for individual sites
-
-The extension has an options page with one checkbox per site, so you can keep
-(say) Slack and GitHub themed while leaving Notion and Discord exactly as they
-ship. Open it by right-clicking the extension's toolbar icon and choosing
-**Options**, or via `brave://extensions` (`chrome://extensions`) → the
-extension → **Details** → **Extension options**.
-
-All sites are enabled by default, and the setting lives in `chrome.storage.sync`
-— so it follows your browser profile to your other machines, and a newly added
-site pack turns itself on without you doing anything.
-
-Toggles apply live: unchecking a site stops it repainting and drops the injected
-variables straight away, no reload needed. The one exception is Slack, which
-paints some surfaces inline to beat its own cascade — those persist until you
-reload the tab. Re-checking a site repaints it immediately.
-
-### Editing the rules
 
 All visual rules live in `extension/content.js` inside the big template
 string. Search for `===== main / message area =====`, `===== left tab rail`,
@@ -247,9 +225,6 @@ Slack tab.
   the real workhorse; the keyboard attempt is best-effort.
 - **Only one workspace at a time has been tested.** Multi-workspace setups
   should work since the selectors are workspace-agnostic, but PRs welcome.
-- **No toolbar popup.** The options page (per-site toggles, see
-  [Customization](#turning-theming-off-for-individual-sites)) is the only UI;
-  everything else is a content script and a service worker.
 
 ## Repository layout
 
