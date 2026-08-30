@@ -11,8 +11,9 @@ pack — repaints chrome/sidebar/message pane and auto-flips Slack's Light/Dark
 Color Mode), WhatsApp Web (`whatsapp.js`, declarative), GitHub (`github.js`,
 declarative Primer tokens), Linear (`linear.js`), Discord (`discord.js`),
 Outlook Web (`outlook.js`, Fluent v9 tokens), Notion (`notion.js`,
-`--c-`/`--ca-` tokens + a Prism syntax palette), and HEY email + calendar
-(`hey.js`, one pack for both). A **bash
+`--c-`/`--ca-` tokens + a Prism syntax palette), HEY email + calendar
+(`hey.js`, one pack for both), and Reddit (`reddit.js`, shreddit's semantic
+`--color-*` set). A **bash
 native-messaging host** reads the active Omarchy theme from
 `~/.local/state/omarchy/current/` and pushes theme changes to the extension
 the moment they land. **Requires Omarchy 4+.**
@@ -193,6 +194,43 @@ script.
     family → the palette colour farthest from every already-taken role → the
     accent. The distance scan is explicit because `highlightColor()` avoids only
     ONE colour and kept handing back the colour already used for `negative`.
+  - `reddit.js` — **the Reddit pack** (declarative tier): maps shreddit's
+    `--color-neutral-*` surface/ink/border ladder, `--color-primary-*` and
+    `--color-secondary-*`, the four `--color-button-*` families, inputs,
+    switches, inverted tooltip surfaces, and the legacy `--color-tone-1..7`
+    ladder. 235 properties, no `apply()` and no `onColorMode`. Verified live
+    2026-08-31, logged in, against `www.reddit.com`.
+    **The friendliest kind of target, for three measured reasons.** Zero
+    triplet-valued tokens (nothing is consumed as `rgb(var(--x))`), so the
+    format trap that shaped Slack and HEY does not exist. 20 of 2901 elements
+    on the logged-in home feed carry a colour-valued style attribute and **not
+    one carries an inline `!important`**, so no observer or rAF repaint path.
+    And light/dark rides `prefers-color-scheme` with no user setting: Reddit
+    stamps `theme-dark` on `<html>` from a matchMedia listener that the shim
+    drives, verified by emulating the media feature *at boot* and watching the
+    class flip.
+    **Votes keep their meaning but take the theme's hue** — red for upvote,
+    magenta for downvote, the same call `discord.js` makes for the red ping
+    badge — behind a chroma floor matching the engine's own `NAMED_MIN_CHROMA`.
+    Below it (`white`, `vantablack`) they keep Reddit's orangered and
+    periwinkle, because two identical grey arrows destroy the one distinction
+    on the page that has to survive.
+    **Community themes are gone.** Subreddits once carried a mod-chosen key
+    colour; sweeping eight heavily-branded subreddits while logged in returns an
+    identical `--color-neutral-background` on every one and no community-scoped
+    declarations anywhere. What a subreddit still customises is its banner
+    IMAGE and icon, which are media. So unlike GitHub there is no per-page
+    opt-out to build. Matches `www.reddit.com` only — `old.reddit.com` is a
+    separate front end where subreddits inject arbitrary CSS, and
+    `sh.reddit.com` now 301s to `www`, which serves no document for a content
+    script to run in.
+    **Deliberately unmapped**: `--color-global-*` (Reddit's literal constants —
+    orangered, white, black, alienblue, online/offline, admin, moderator, nsfw,
+    gold — the same shape as Outlook's `--white`), `--color-tags-*` (40 flair
+    tokens; authoring choices), `--color-identity-*` and `--color-category-*`
+    (who or what something is, not chrome), `--color-media-*` (controls that
+    ride ON media and must stay white-on-scrim), the scrims, and the
+    `--color-elevation-*` shadow ramps.
   - `background.js` — MV3 service worker. Holds the native-messaging port,
     rebroadcasts pushed themes to matched tabs (the site list is derived from
     the manifest's content-script matches — adding a pack never touches this
@@ -404,6 +442,20 @@ and drive `ctx.pages()` / `ctx.serviceWorkers()`. Gotchas, all learned the hard 
 - **Screenshots hang** when the window is occluded (no frames are composited);
   `fromSurface: false` doesn't help. Assert on `getComputedStyle` instead — it's
   more precise than a screenshot anyway.
+
+**The CSSOM walk below assumes same-origin stylesheets, and that is not
+universal.** 7 of Reddit's 27 sheets are cross-origin, so `cssRules` throws and
+the walk sees only 15 of 141 names. When `document.styleSheets` reports blocked
+sheets, collect their `href`s and **fetch and parse the CSS text in node**
+instead, then resolve each name through `getComputedStyle` on `<html>` once per
+polarity. Drive polarity with `page.emulateMedia({colorScheme})` set BEFORE the
+navigation — apps that read matchMedia only at boot ignore a later change.
+
+**A harness that pushes a theme must own `chrome.storage.local`, not just send
+the message.** `background.js` re-pushes the STORED theme on `tabs.onUpdated`
+and answers `request-theme` from it, so in any profile that has a working native
+host the real theme wins the race the moment the page finishes loading. The
+symptom is a correct-looking paint in the wrong theme. Set storage AND send.
 
 To audit how a site consumes a design token (the thing that makes token bugs
 diagnosable), walk the CSSOM in the page — Slack's stylesheets are same-origin
