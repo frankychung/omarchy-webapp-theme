@@ -1,7 +1,7 @@
 # omarchy-webapp-theme
 
 A tiny browser extension that makes web apps — **Slack, WhatsApp Web, GitHub,
-Linear, Discord, Outlook, Notion, and HEY** — follow your [Omarchy](https://omarchy.org/)
+Linear, Discord, Outlook, Notion, HEY, and Reddit** — follow your [Omarchy](https://omarchy.org/)
 theme: painting their surfaces with your terminal's palette and flipping their
 Light/Dark mode whenever you switch omarchy themes, so they visually blend into
 the rest of your desktop.
@@ -29,8 +29,10 @@ Chrome, Chromium, and Edge.
   avatars recolored from your terminal palette), GitHub (Primer design tokens),
   Linear (sidebar + elevation ladder), Discord, Outlook Web (Fluent v9
   tokens), Notion (surfaces, body copy, and code-block syntax highlighting
-  drawn from your terminal palette), and HEY (email + calendar in one pack) ship
-  too — adding another site is one pack file + one manifest entry.
+  drawn from your terminal palette), HEY (email + calendar in one pack), and
+  Reddit (shreddit's semantic token set, with vote arrows recolored from your
+  terminal palette) ship too — adding another site is one pack file + one
+  manifest entry.
 
 https://github.com/user-attachments/assets/5c67741e-c6df-4f48-8c1a-72eadcc805bb
 
@@ -101,7 +103,7 @@ from `omarchy-slack-theme`? The setup cleans up the old name's wiring too.)
 
 Then fully quit your browser and open any supported site — `app.slack.com`,
 `web.whatsapp.com`, `github.com`, `linear.app`, `discord.com`,
-`outlook.office.com`, `app.notion.com`, or `app.hey.com`.
+`outlook.office.com`, `app.notion.com`, `app.hey.com`, or `www.reddit.com`.
 
 Then see **[Per-site setup](#per-site-setup)** for the appearance setting a
 few apps need, and for the extension options that turn theming off per site.
@@ -152,6 +154,7 @@ extension — the palette changes, the polarity doesn't. Put those on "system":
 | Linear | **System preference** | `Ctrl+K` → "Change interface theme" (per-device) |
 | Discord | **Sync with computer** (Discord's "Auto") | Settings → Appearance → Theme |
 | Notion | **Use system setting** | Settings → My settings → Appearance |
+| Reddit | **Auto** (Reddit follows the system by default) | Settings → Appearance → Theme |
 
 Slack, Outlook, and HEY need nothing: Slack's Appearance radio is flipped
 automatically, and Outlook/HEY already follow the system.
@@ -243,6 +246,7 @@ extension/
 ├── outlook.js                      # the Outlook pack: Fluent v9 CSS-var table
 ├── notion.js                       # the Notion pack: --c-/--ca- tokens + Prism syntax
 ├── hey.js                          # the HEY pack (email + calendar): --rgb-/--color- tokens
+├── reddit.js                       # the Reddit pack: shreddit --color-* semantic tokens
 └── inject-prefers-color-scheme.js  # MAIN-world: matchMedia polyfill + React-click bridge
 
 native-host/

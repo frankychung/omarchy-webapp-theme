@@ -29,7 +29,8 @@
     "*://app.notion.com/*",
     "*://www.notion.so/*",
     "*://notion.so/*",
-    "*://app.hey.com/*"
+    "*://app.hey.com/*",
+    "*://www.reddit.com/*"
   ],
   "background": {
     "service_worker": "background.js"
@@ -51,7 +52,8 @@
         "*://app.notion.com/*",
         "*://www.notion.so/*",
         "*://notion.so/*",
-        "*://app.hey.com/*"
+        "*://app.hey.com/*",
+        "*://www.reddit.com/*"
       ],
       "js": [
         "inject-prefers-color-scheme.js"
@@ -76,7 +78,8 @@
         "*://app.notion.com/*",
         "*://www.notion.so/*",
         "*://notion.so/*",
-        "*://app.hey.com/*"
+        "*://app.hey.com/*",
+        "*://www.reddit.com/*"
       ],
       "js": [
         "omarchy-colors.js",
@@ -169,6 +172,16 @@
       ],
       "js": [
         "hey.js"
+      ],
+      "run_at": "document_start",
+      "all_frames": false
+    },
+    {
+      "matches": [
+        "*://www.reddit.com/*"
+      ],
+      "js": [
+        "reddit.js"
       ],
       "run_at": "document_start",
       "all_frames": false
