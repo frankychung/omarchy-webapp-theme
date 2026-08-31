@@ -73,6 +73,8 @@ const X_LITERALS = {
     "border|rgb(62, 65, 68)": "borderStrong",
     "border|rgb(68, 68, 71)": "borderStrong",
     "border|rgb(89, 93, 98)": "borderStrong",
+    "ink|rgb(62, 65, 68)": "fgFaint",
+    "ink|rgb(68, 68, 71)": "fgFaint",
     "ink|rgb(100, 105, 109)": "fgMuted",
     "ink|rgb(113, 118, 123)": "fgMuted",
     "ink|rgb(117, 117, 117)": "fgMuted",
@@ -111,6 +113,12 @@ const X_LITERALS = {
     "border|rgb(207, 217, 222)": "borderStrong",
     "border|rgb(185, 202, 211)": "borderStrong",
     "border|rgb(159, 181, 195)": "borderStrong",
+    // X spends this one as a decorative/disabled icon ink as well as a border
+    // and a surface — 12 SVG glyphs on the timeline inherit it. At 1.7:1 on
+    // white it is deliberately faint, so it maps to fgFaint rather than
+    // fgMuted, which would make the icons darker than X draws them.
+    "ink|rgb(207, 217, 222)": "fgFaint",
+    "ink|rgb(185, 202, 211)": "fgFaint",
     "ink|rgb(83, 100, 113)": "fgMuted",
     "ink|rgb(107, 127, 142)": "fgMuted",
     "ink|rgb(130, 154, 171)": "fgMuted",
@@ -217,6 +225,10 @@ OmarchyTheme.register({
       borderStrong: withAlpha(s.fg, 0.3),
       fg: s.fg,
       fgMuted: s.sidebarMuted,
+      // Decorative and disabled iconography. X draws these near the floor of
+      // legibility on purpose; matching fgMuted would make them louder than the
+      // real copy beside them.
+      fgFaint: withAlpha(s.fg, 0.32),
       accent: s.accent,
       accentHover: shade(s.accent, dir * 0.06),
       accentActive: shade(s.accent, dir * 0.12),
@@ -268,26 +280,34 @@ OmarchyTheme.register({
     }
 
     // 2. The inline painters. X sets colour from JS on ~150 elements and the
-    //    rest inherits, so a handful of attribute selectors covers all of it. A
-    //    declaration is either FIRST in the attribute or preceded by "; ", which
-    //    is what keeps `color:` from also matching `background-color:`.
-    const inline = new Map();
-    for (const el of document.querySelectorAll("[style]")) {
-      for (const decl of (el.getAttribute("style") || "").split(";")) {
-        const m = /^\s*([a-z-]+)\s*:\s*(.+?)\s*$/.exec(decl);
-        if (!m || COLOR_PROPS.indexOf(m[1]) === -1) continue;
-        const mapped = resolve(m[1], m[2]);
-        if (mapped) inline.set(m[1] + "|" + m[2], mapped);
-      }
-    }
-    for (const [key, mapped] of inline) {
+    //    rest inherits, so a handful of attribute selectors covers all of it.
+    //
+    //    These are emitted FROM THE TABLE, not from a scan of the live DOM.
+    //    Scanning was the first version and it breaks on a light<->dark switch:
+    //    X re-renders with the other palette AFTER the theme push, writing
+    //    inline values that were not in the DOM when apply() ran, and no new
+    //    CSS rule is inserted so the rule-count poll never fires either. The
+    //    result was permanent until reload — 494 elements still painting X's
+    //    muted grey after switching from a light omarchy theme to a dark one.
+    //    The table already knows every value worth rewriting, so just emit
+    //    them all; a selector that matches nothing costs nothing.
+    //
+    //    A declaration is either FIRST in the style attribute or preceded by
+    //    "; ", which is what keeps `color:` from also matching
+    //    `background-color:`.
+    const INLINE_PROPS = { ink: ["color", "fill"], bg: ["background-color"], border: ["border-color"] };
+    for (const key of Object.keys(table)) {
       const idx = key.indexOf("|");
-      const prop = key.slice(0, idx);
+      const cls = key.slice(0, idx);
       const value = key.slice(idx + 1);
-      const sel = prop === "color"
-        ? `[style^="color: ${value}"], [style*="; color: ${value}"]`
-        : `[style*="${prop}: ${value}"]`;
-      out.push(`${sel}{${prop}:${mapped} !important}`);
+      const mapped = roles[table[key]];
+      if (!mapped) continue;
+      for (const prop of INLINE_PROPS[cls]) {
+        const sel = prop === "color"
+          ? `[style^="color: ${value}"], [style*="; color: ${value}"]`
+          : `[style*="${prop}: ${value}"]`;
+        out.push(`${sel}{${prop}:${mapped} !important}`);
+      }
     }
 
     let style = document.getElementById(STYLE_ID);
