@@ -65,7 +65,7 @@ OmarchyTheme.register({
     // is the outer canvas behind the feed (darker than the page on dark themes,
     // #000000 vs #0E1113) while `container`/`strong` are the post cards on top
     // of it. So `weak` shades AGAINST dir and the rest shade with it.
-    const recessed = shade(theme.bg, -dir * 0.02);
+    const recessed = shadeAway(theme.bg, -dir * 0.02);
     const raised1 = shade(theme.bg, dir * 0.03);
     const raised2 = shade(theme.bg, dir * 0.05);
     const raised3 = shade(theme.bg, dir * 0.08);

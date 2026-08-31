@@ -50,6 +50,23 @@ function shade(hex, delta) {
   return `rgb(${f(c.r)}, ${f(c.g)}, ${f(c.b)})`;
 }
 
+// shade() CLAMPS at the ends of the range, so a shade that walks toward an
+// extreme the color is already sitting on returns the color itself. That is
+// silent: the caller gets a valid color that happens to be identical to the
+// surface it was meant to separate from. It bites exactly where a monochrome
+// theme lives — `vantablack` (#000) has no room to go darker and `white`
+// (#fff) none to go lighter — and both are shipped themes.
+//
+// Packs hit this on the surface BELOW the page (the outer canvas an app's panes
+// float on), which by definition moves opposite to the elevation direction and
+// so is the one shade that can run out of room. Flip direction rather than
+// collapse: a canvas that is lighter than the page still reads as a different
+// surface, whereas one that equals the page does not read at all.
+function shadeAway(color, delta) {
+  const out = shade(color, delta);
+  return out === shade(color, 0) ? shade(color, -delta) : out;
+}
+
 function withAlpha(hex, alpha) {
   const c = hexToRgb(hex);
   if (!c) return hex;
