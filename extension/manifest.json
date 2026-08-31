@@ -31,7 +31,9 @@
     "*://notion.so/*",
     "*://app.hey.com/*",
     "*://www.reddit.com/*",
-    "*://app.fastmail.com/*"
+    "*://app.fastmail.com/*",
+    "*://x.com/*",
+    "*://twitter.com/*"
   ],
   "background": {
     "service_worker": "background.js"
@@ -55,7 +57,9 @@
         "*://notion.so/*",
         "*://app.hey.com/*",
         "*://www.reddit.com/*",
-        "*://app.fastmail.com/*"
+        "*://app.fastmail.com/*",
+        "*://x.com/*",
+        "*://twitter.com/*"
       ],
       "js": [
         "inject-prefers-color-scheme.js"
@@ -82,7 +86,9 @@
         "*://notion.so/*",
         "*://app.hey.com/*",
         "*://www.reddit.com/*",
-        "*://app.fastmail.com/*"
+        "*://app.fastmail.com/*",
+        "*://x.com/*",
+        "*://twitter.com/*"
       ],
       "js": [
         "omarchy-colors.js",
@@ -195,6 +201,17 @@
       ],
       "js": [
         "fastmail.js"
+      ],
+      "run_at": "document_start",
+      "all_frames": false
+    },
+    {
+      "matches": [
+        "*://x.com/*",
+        "*://twitter.com/*"
+      ],
+      "js": [
+        "x.js"
       ],
       "run_at": "document_start",
       "all_frames": false

@@ -15,6 +15,7 @@ const SITES = [
   { id: "hey", label: "HEY + Calendar", host: "app.hey.com" },
   { id: "reddit", label: "Reddit", host: "www.reddit.com" },
   { id: "fastmail", label: "Fastmail", host: "app.fastmail.com" },
+  { id: "x", label: "X (Twitter)", host: "x.com" },
 ];
 
 const container = document.getElementById("sites");
