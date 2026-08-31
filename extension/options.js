@@ -14,6 +14,7 @@ const SITES = [
   { id: "notion", label: "Notion", host: "app.notion.com" },
   { id: "hey", label: "HEY + Calendar", host: "app.hey.com" },
   { id: "reddit", label: "Reddit", host: "www.reddit.com" },
+  { id: "fastmail", label: "Fastmail", host: "app.fastmail.com" },
 ];
 
 const container = document.getElementById("sites");

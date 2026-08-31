@@ -1,7 +1,7 @@
 # omarchy-webapp-theme
 
 A tiny browser extension that makes web apps — **Slack, WhatsApp Web, GitHub,
-Linear, Discord, Outlook, Notion, HEY, and Reddit** — follow your [Omarchy](https://omarchy.org/)
+Linear, Discord, Outlook, Notion, HEY, Reddit, and Fastmail** — follow your [Omarchy](https://omarchy.org/)
 theme: painting their surfaces with your terminal's palette and flipping their
 Light/Dark mode whenever you switch omarchy themes, so they visually blend into
 the rest of your desktop.
@@ -29,10 +29,11 @@ Chrome, Chromium, and Edge.
   avatars recolored from your terminal palette), GitHub (Primer design tokens),
   Linear (sidebar + elevation ladder), Discord, Outlook Web (Fluent v9
   tokens), Notion (surfaces, body copy, and code-block syntax highlighting
-  drawn from your terminal palette), HEY (email + calendar in one pack), and
-  Reddit (shreddit's semantic token set, with vote arrows recolored from your
-  terminal palette) ship too — adding another site is one pack file + one
-  manifest entry.
+  drawn from your terminal palette), HEY (email + calendar in one pack), Reddit
+  (shreddit's semantic token set, with vote arrows recolored from your terminal
+  palette), and Fastmail (the `--ui-*` design system, including the
+  pre-composited page-fade ladder) ship too — adding another site is one pack
+  file + one manifest entry.
 
 https://github.com/user-attachments/assets/5c67741e-c6df-4f48-8c1a-72eadcc805bb
 
@@ -103,7 +104,7 @@ from `omarchy-slack-theme`? The setup cleans up the old name's wiring too.)
 
 Then fully quit your browser and open any supported site — `app.slack.com`,
 `web.whatsapp.com`, `github.com`, `linear.app`, `discord.com`,
-`outlook.office.com`, `app.notion.com`, `app.hey.com`, or `www.reddit.com`.
+`outlook.office.com`, `app.notion.com`, `app.hey.com`, `www.reddit.com`, or `app.fastmail.com`.
 
 Then see **[Per-site setup](#per-site-setup)** for the appearance setting a
 few apps need, and for the extension options that turn theming off per site.
@@ -155,6 +156,7 @@ extension — the palette changes, the polarity doesn't. Put those on "system":
 | Discord | **Sync with computer** (Discord's "Auto") | Settings → Appearance → Theme |
 | Notion | **Use system setting** | Settings → My settings → Appearance |
 | Reddit | **Auto** (Reddit follows the system by default) | Settings → Appearance → Theme |
+| Fastmail | **Auto** (Fastmail follows the system by default) | Settings → Appearance → Colour scheme |
 
 Slack, Outlook, and HEY need nothing: Slack's Appearance radio is flipped
 automatically, and Outlook/HEY already follow the system.
@@ -175,6 +177,10 @@ A few packs also leave things deliberately untouched:
 - **HEY** — one pack covers both email and Calendar. Received mail keeps its
   white sheet and dark ink on purpose: HEY renders the sender's HTML as
   authored rather than transforming it for dark mode.
+- **Fastmail** — contact avatar colours and quoted-reply nesting levels keep
+  their own hues. The avatar hues identify who a message is from (fifteen of
+  them, more than a terminal palette has to give), and quote levels sit inside
+  the sender's own message body.
 
 ## Verifying it works
 
@@ -247,6 +253,7 @@ extension/
 ├── notion.js                       # the Notion pack: --c-/--ca- tokens + Prism syntax
 ├── hey.js                          # the HEY pack (email + calendar): --rgb-/--color- tokens
 ├── reddit.js                       # the Reddit pack: shreddit --color-* semantic tokens
+├── fastmail.js                     # the Fastmail pack: --ui-*/--theme-color-* tokens
 └── inject-prefers-color-scheme.js  # MAIN-world: matchMedia polyfill + React-click bridge
 
 native-host/
