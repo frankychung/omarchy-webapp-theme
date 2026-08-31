@@ -13,7 +13,8 @@ declarative Primer tokens), Linear (`linear.js`), Discord (`discord.js`),
 Outlook Web (`outlook.js`, Fluent v9 tokens), Notion (`notion.js`,
 `--c-`/`--ca-` tokens + a Prism syntax palette), HEY email + calendar
 (`hey.js`, one pack for both), Reddit (`reddit.js`, shreddit's semantic
-`--color-*` set), and Fastmail (`fastmail.js`, the `--ui-*` design system). A **bash
+`--color-*` set), Fastmail (`fastmail.js`, the `--ui-*` design system), and X
+(`x.js`, full tier — a brand-literal table with selectors found at runtime). A **bash
 native-messaging host** reads the active Omarchy theme from
 `~/.local/state/omarchy/current/` and pushes theme changes to the extension
 the moment they land. **Requires Omarchy 4+.**
@@ -270,6 +271,40 @@ script.
     `--ui-featureonboarding-*` / `--ui-featuretour-*` / `--ui-newfeatureicon-*`
     promotional artwork, several of which are multi-stop gradients whose stops
     only make sense together.
+  - `x.js` — **the X pack** (full tier): the only site here with NO design-token
+    layer. Its 44 custom properties are a toast library plus a `--gray1..12`
+    ramp, not the app surfaces. Verified live 2026-08-31, logged in, against
+    `x.com` across the home timeline, a profile, `/explore` and settings.
+    **The shape: hard-code the colours, discover the selectors.** X ships atomic
+    CSS — 1730 style rules, one declaration each, behind hashed class names
+    (`.r-kemksi { background-color: rgb(0, 0, 0) }`). The class names change
+    whenever X rebuilds, so they must never be hard-coded; the declared colour is
+    stable brand palette. The pack walks X's own stylesheets and re-emits each
+    rule whose value is in its table with the same selector and `!important`.
+    Nothing X paints carries an inline `!important` (393 elements have a style
+    attribute, none use it), so an author-level rule wins everywhere — the
+    problem here was only ever finding selectors, never specificity.
+    **A luminance classifier was built first and rejected.** Interpolating each
+    literal by where it sits between the page and the body text looks principled
+    and is too sharp a knife: X's muted ink lands at 0.23 of that range, so any
+    threshold near there decides between "muted text" and "ink on a light chip",
+    and the wrong side renders 52 timestamps in the page background — invisible
+    rather than merely wrong. **Prefer a table with no thresholds over a
+    classifier with one**, in any pack where the site does not name its colours.
+    **`rgb(0, 0, 0)` is deliberately absent from the table** as both ink and
+    background: it is the page in Lights out, the Post button in Light, X's
+    hidden accessibility headings, and the ink on a light chip. Four meanings,
+    one literal, nothing to separate them.
+    **Scrims are excluded from alpha-splitting.** A translucent black in X is
+    always an overlay, never a surface; mapping it painted the lightbox dimmer
+    and the video controls in the accent on every light theme.
+    Matches `x.com` and `twitter.com`. **Not covered**: a user who pinned "Dim",
+    a third palette this pack has not measured. **Deliberately unmapped**:
+    keyword values (20 rules set `border-color: black` on 6205 elements as part
+    of react-native-web's reset, all with zero border width), the engagement
+    hues (like/repost/alert — already mutually distinct, and X offers six accent
+    choices of its own), media and everything painted over it, and the
+    verification badges.
   - `background.js` — MV3 service worker. Holds the native-messaging port,
     rebroadcasts pushed themes to matched tabs (the site list is derived from
     the manifest's content-script matches — adding a pack never touches this
@@ -501,6 +536,34 @@ the message.** `background.js` re-pushes the STORED theme on `tabs.onUpdated`
 and answers `request-theme` from it, so in any profile that has a working native
 host the real theme wins the race the moment the page finishes loading. The
 symptom is a correct-looking paint in the wrong theme. Set storage AND send.
+
+**`CSSStyleRule.cssRules` IS TRUTHY, so the idiomatic CSSOM walk is broken.**
+Under CSS Nesting every style rule now carries an empty `CSSRuleList`, which
+means the usual guard
+
+```js
+if (rule.cssRules) { walk(rule.cssRules); continue; }   // WRONG
+```
+
+recurses into nothing and `continue`s past **every style rule in the document**.
+It fails silently — you get a plausible-looking rule count and zero
+declarations. It cost two false conclusions in one session: that Fastmail's
+tokens were unreadable from the CSSOM, and that X declared no colours at all
+(X declares 364 distinct property/value pairs). Discriminate on `rule.style`,
+which only style rules have, and recurse only when `cssRules.length` is
+non-zero:
+
+```js
+if (rule.style && rule.selectorText) { /* read declarations */ }
+if (rule.cssRules && rule.cssRules.length) walk(rule.cssRules);
+```
+
+**A MutationObserver cannot see `insertRule`.** Apps that register styles at
+runtime (X, and anything on react-native-web or a CSS-in-JS runtime) add rules
+to stylesheets that already exist, producing no DOM mutation at all. Watching
+for added `<style>` nodes silently under-covers every route the tab did not
+load on. Poll the total rule count instead — summing `cssRules.length` over a
+handful of sheets is a few property reads.
 
 To audit how a site consumes a design token (the thing that makes token bugs
 diagnosable), walk the CSSOM in the page — Slack's stylesheets are same-origin
