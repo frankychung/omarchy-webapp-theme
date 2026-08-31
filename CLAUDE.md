@@ -12,8 +12,8 @@ Color Mode), WhatsApp Web (`whatsapp.js`, declarative), GitHub (`github.js`,
 declarative Primer tokens), Linear (`linear.js`), Discord (`discord.js`),
 Outlook Web (`outlook.js`, Fluent v9 tokens), Notion (`notion.js`,
 `--c-`/`--ca-` tokens + a Prism syntax palette), HEY email + calendar
-(`hey.js`, one pack for both), and Reddit (`reddit.js`, shreddit's semantic
-`--color-*` set). A **bash
+(`hey.js`, one pack for both), Reddit (`reddit.js`, shreddit's semantic
+`--color-*` set), and Fastmail (`fastmail.js`, the `--ui-*` design system). A **bash
 native-messaging host** reads the active Omarchy theme from
 `~/.local/state/omarchy/current/` and pushes theme changes to the extension
 the moment they land. **Requires Omarchy 4+.**
@@ -231,6 +231,45 @@ script.
     (who or what something is, not chrome), `--color-media-*` (controls that
     ride ON media and must stay white-on-scrim), the scrims, and the
     `--color-elevation-*` shadow ramps.
+  - `fastmail.js` — **the Fastmail pack** (declarative tier): maps the
+    `--ui-<component>-color-<role>[-<state>]` system — page surfaces, the fade
+    ladder, top bar, sidebar, layers, five button families, inputs, semantic
+    icons, the four status families and the inverse toast — plus the
+    `--theme-color-*` layer above it. 166 properties, no `apply()` and no
+    `onColorMode`. Verified live 2026-08-31, logged in, against
+    `app.fastmail.com` — 296 custom properties enumerated across both
+    polarities, 216 colour-valued.
+    **The cleanest target in the repo.** Zero triplet-valued tokens. 196 of 1741
+    elements carry a style attribute and **exactly one is colour-valued**, none
+    with an inline `!important` — it beats HEY's previous record. Zero
+    cross-origin stylesheets. Light/dark rides `prefers-color-scheme` via a
+    `t-light`/`t-dark` class on `<html>` that the shim drives.
+    **That class is also the safety net.** Every token this pack does NOT map
+    still resolves to a polarity-correct value, so leaving something alone here
+    costs theme coherence and nothing else. That is not true of a site shipping
+    one palette, and it is why this pack leaves more on the table than Reddit's.
+    **The `--ui-page-color-bg-fade0..100` ladder is pre-composited** — each rung
+    is a wash of the page colour itself (`hsla(0,0%,100%,.6)` in light), and they
+    drive every scroll mask and sticky-header fade. Regenerate the whole ladder
+    from the terminal background or a white halo survives at the top of every
+    list. Same shape as any `-fade`/`-alpha` suffixed token: check whether the
+    site baked its own background into the value before reusing it.
+    **Fastmail's own colour theme is overridden, deliberately.** Picking a theme
+    in settings rewrites `--theme-color-header` and friends; this pack writes
+    over that. The content rule protects content authored by someone ELSE. A
+    Fastmail colour theme is the user's own choice about chrome, and installing
+    this extension is a later and more specific choice about the same chrome —
+    the same reasoning under Slack's pack overriding Slack's theme picker.
+    Matches `app.fastmail.com` only; `www.fastmail.com` is the marketing site.
+    **Deliberately unmapped**: `--ui-avatar-color-fg-1..15` (identity colouring —
+    fifteen separated hues per contact, more than a terminal palette can give
+    without collapsing two contacts onto one colour; same call as Reddit's
+    `--color-identity-*`), `--ui-quote-color-*` (quote nesting INSIDE the message
+    body, which is the sender's), `--ui-icon-emoji-color-fill-*` (identical in
+    both polarities, which is the app saying "literal"), and the 22 tokens of
+    `--ui-featureonboarding-*` / `--ui-featuretour-*` / `--ui-newfeatureicon-*`
+    promotional artwork, several of which are multi-stop gradients whose stops
+    only make sense together.
   - `background.js` — MV3 service worker. Holds the native-messaging port,
     rebroadcasts pushed themes to matched tabs (the site list is derived from
     the manifest's content-script matches — adding a pack never touches this
@@ -450,6 +489,12 @@ sheets, collect their `href`s and **fetch and parse the CSS text in node**
 instead, then resolve each name through `getComputedStyle` on `<html>` once per
 polarity. Drive polarity with `page.emulateMedia({colorScheme})` set BEFORE the
 navigation — apps that read matchMedia only at boot ignore a later change.
+
+**`page.goto` cannot always wait for `domcontentloaded`.** Fastmail's service
+worker keeps the load event pending indefinitely, so both `domcontentloaded` and
+`load` hang until the timeout and the harness looks frozen rather than failing.
+Use `waitUntil: "commit"` plus an explicit `waitForTimeout` for the app to boot.
+Treat the wait state as per-site, not a constant.
 
 **A harness that pushes a theme must own `chrome.storage.local`, not just send
 the message.** `background.js` re-pushes the STORED theme on `tabs.onUpdated`
